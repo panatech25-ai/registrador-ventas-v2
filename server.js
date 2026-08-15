@@ -6,13 +6,16 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
 
+// 🟢 Servir carpeta estática con path absoluto para compatibilidad con Vercel
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Conexión a Supabase
 const supabaseUrl = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim() : '';
 const supabaseKey = process.env.SUPABASE_KEY ? process.env.SUPABASE_KEY.trim() : '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Credenciales
+// Credenciales de Usuario por Marca
 const USUARIOS = {
     panatech: {
         'npanadisi': 'Asdasdasd123!',
@@ -21,12 +24,12 @@ const USUARIOS = {
         'bprimo': 'Austra2706!'
     },
     incanto: {
-        'npanadisi': 'Asdasdasd123',
+        'npanadisi': 'Asdasdasd123!',
         'bprimo': 'Austra2706!'
     }
 };
 
-// Pantalla Inicial
+// 1. Pantalla Inicial (Selección de Marca)
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html>
@@ -56,6 +59,7 @@ app.get('/', (req, res) => {
     `);
 });
 
+// Función auxiliar para renderizar el Login
 function renderLogin(res, marca, errorMsg = null) {
     const brand = marca.toLowerCase();
     const esPanatech = brand === 'panatech';
@@ -98,6 +102,7 @@ function renderLogin(res, marca, errorMsg = null) {
     `);
 }
 
+// 2. Rutas de Login
 app.get('/login/:marca', (req, res) => renderLogin(res, req.params.marca));
 
 app.post('/login/:marca', (req, res) => {
@@ -112,7 +117,7 @@ app.post('/login/:marca', (req, res) => {
     }
 });
 
-// API Buscar Productos
+// 🔍 API 1: Buscar Productos por Marca
 app.get('/api/productos/buscar', async (req, res) => {
     const { q, marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -141,7 +146,7 @@ app.get('/api/productos/buscar', async (req, res) => {
     }
 });
 
-// API Actualizar Precio y Stock de Producto
+// 📦 API 1.1: Actualizar Precio y Stock de un Producto en Supabase
 app.put('/api/productos/:id/stock', async (req, res) => {
     const { id } = req.params;
     const { precio, stock } = req.body;
@@ -163,7 +168,7 @@ app.put('/api/productos/:id/stock', async (req, res) => {
     }
 });
 
-// API Cargar Producto Manual
+// ➕ API 2: Cargar Producto Manual
 app.post('/api/productos/manual', async (req, res) => {
     const { nombre, variante, precio, stock, marca } = req.body;
     try {
@@ -184,7 +189,7 @@ app.post('/api/productos/manual', async (req, res) => {
     }
 });
 
-// API Obtener Últimas 5 Órdenes
+// 📋 API 3: Obtener Últimas 5 Órdenes
 app.get('/api/ordenes/ultimas', async (req, res) => {
     const { marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -206,7 +211,7 @@ app.get('/api/ordenes/ultimas', async (req, res) => {
     }
 });
 
-// API Crear Nueva Orden
+// 📝 API 4: Crear Nueva Orden
 app.post('/api/ordenes', async (req, res) => {
     const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, productos, total, estado, metodo_pago, marca } = req.body;
 
@@ -252,7 +257,7 @@ app.post('/api/ordenes', async (req, res) => {
     }
 });
 
-// API Buscar Orden
+// 🔎 API 5: Buscar Orden Exclusiva por Marca
 app.get('/api/ordenes/buscar/:num', async (req, res) => {
     const { marca } = req.query;
     const num = req.params.num.trim().toUpperCase();
@@ -275,7 +280,7 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
     res.json(orden);
 });
 
-// API Actualizar Orden
+// ✏️ API 6: Actualizar Orden
 app.put('/api/ordenes/:id', async (req, res) => {
     const { id } = req.params;
     const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago } = req.body;
@@ -290,7 +295,7 @@ app.put('/api/ordenes/:id', async (req, res) => {
     res.json({ success: true, data });
 });
 
-// API Exportar CSV Filtrado por Rango de Fechas
+// 📊 API 7: Exportar CSV Filtrado por Fechas
 app.get('/api/ordenes/exportar', async (req, res) => {
     const { desde, hasta, marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -325,4 +330,4 @@ app.get('/api/ordenes/exportar', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
