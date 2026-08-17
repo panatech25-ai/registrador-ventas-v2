@@ -474,14 +474,12 @@ async function guardarProductoManual() {
     }
 }
 
-// Imprimir Etiqueta con Formato Visual Completo (Logos e Íconos)
+// Imprimir Etiqueta con Formato Visual Completo y Redes Sociales (Sin Cadete)
 function imprimirEtiqueta() {
-    const numOrden = document.getElementById('buscarOrdenInput').value || '#PAN-xxxx';
     const cliente = document.getElementById('cliente_nombre').value || 'Cliente sin especificar';
     const telefono = document.getElementById('cliente_telefono').value || 'Sin teléfono';
     const observaciones = document.getElementById('observaciones').value || '';
     const modo = document.getElementById('modo_entrega').value;
-    const cadete = document.getElementById('cadete').value;
     const direccion = document.getElementById('direccion_envio').value;
     const horario = document.getElementById('horario_envio').value;
 
@@ -489,12 +487,16 @@ function imprimirEtiqueta() {
     const logoSrc = esIncanto ? '/logos/incanto.png' : '/logos/panatech.png';
     const colorMarca = esIncanto ? '#be123c' : '#0284c7';
 
+    // Cuentas de Instagram y Dirección según la marca
+    const igAccount = esIncanto ? 'incanto.rosario' : 'panatech.rosario';
+    const direccionLocal = 'Callao 1255 11E, Rosario';
+
     const vent = window.open('', '_blank', 'width=420,height=600');
     vent.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Etiqueta ${numOrden}</title>
+            <title>Etiqueta de Envío</title>
             <style>
                 * { box-sizing: border-box; }
                 body { 
@@ -517,16 +519,10 @@ function imprimirEtiqueta() {
                     margin-bottom: 10px; 
                 }
                 .logo { 
-                    max-width: 80px; 
-                    max-height: 40px; 
+                    max-width: 100px; 
+                    max-height: 50px; 
                     object-fit: contain; 
                     margin-bottom: 4px; 
-                }
-                .orden-num { 
-                    font-size: 20px; 
-                    font-weight: 900; 
-                    color: ${colorMarca}; 
-                    letter-spacing: 0.5px; 
                 }
                 .field { 
                     margin-bottom: 8px; 
@@ -544,6 +540,14 @@ function imprimirEtiqueta() {
                     font-size: 13px; 
                     font-weight: 600; 
                     color: #0f172a; 
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                }
+                .icon-img {
+                    width: 14px;
+                    height: 14px;
+                    object-fit: contain;
                 }
                 .badge-modo {
                     display: inline-block;
@@ -567,12 +571,19 @@ function imprimirEtiqueta() {
                 }
                 .footer { 
                     font-size: 10px; 
-                    text-align: center; 
                     margin-top: 12px; 
                     border-top: 1px dashed #ccc; 
-                    padding-top: 6px; 
-                    color: #64748b; 
+                    padding-top: 8px; 
+                    color: #475569; 
                     font-weight: 600;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                .footer-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
                 }
             </style>
         </head>
@@ -580,7 +591,6 @@ function imprimirEtiqueta() {
             <div class="ticket">
                 <div class="header">
                     <img src="${logoSrc}" class="logo" alt="${MARCA_ACTUAL}" onerror="this.style.display='none'">
-                    <div class="orden-num">${numOrden}</div>
                 </div>
                 
                 <div class="field">
@@ -589,8 +599,11 @@ function imprimirEtiqueta() {
                 </div>
 
                 <div class="field">
-                    <span class="label">📞 Teléfono</span>
-                    <span class="value">${telefono}</span>
+                    <span class="label">Teléfono</span>
+                    <span class="value">
+                        <img src="/logos/whatsapp.png" class="icon-img" alt="WA" onerror="this.src='https://cdn-icons-png.flaticon.com/512/733/733585.png'">
+                        ${telefono}
+                    </span>
                 </div>
 
                 ${observaciones ? `
@@ -609,11 +622,7 @@ function imprimirEtiqueta() {
                 
                 ${modo === 'Envio' ? `
                     <div class="field">
-                        <span class="label">🛵 Cadete / Empresa</span>
-                        <span class="value">${cadete || '-'}</span>
-                    </div>
-                    <div class="field">
-                        <span class="label">📍 Dirección</span>
+                        <span class="label">📍 Dirección Envío</span>
                         <span class="value">${direccion || '-'}</span>
                     </div>
                     <div class="field">
@@ -622,7 +631,16 @@ function imprimirEtiqueta() {
                     </div>
                 ` : ''}
                 
-                <div class="footer">¡Muchas gracias por tu compra!</div>
+                <div class="footer">
+                    <div class="footer-item">
+                        <img src="/logos/instagram.png" class="icon-img" alt="IG" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2111/2111463.png'">
+                        <span>${igAccount}</span>
+                    </div>
+                    <div class="footer-item">
+                        <img src="/logos/ubicacion.png" class="icon-img" alt="Ubicación" onerror="this.src='https://cdn-icons-png.flaticon.com/512/535/535239.png'">
+                        <span>${direccionLocal}</span>
+                    </div>
+                </div>
             </div>
             <script>
                 window.onload = function() { 
