@@ -1,10 +1,13 @@
 {
+  "id": "registrador-ventas-v2",
   "name": "Panatech - Ventas",
   "short_name": "Panatech",
-  "start_url": "/",
+  "start_url": "/app.html?marca=panatech",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/logos/favicon.png",

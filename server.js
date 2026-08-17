@@ -10,6 +10,16 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 📱 Rutas directas para Service Worker y Manifest PWA
+app.get('/sw.js', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sw.js'));
+});
+
+app.get('/manifest.json', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
+// Conexión Supabase
 const supabaseUrl = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim() : '';
 const supabaseKey = process.env.SUPABASE_KEY ? process.env.SUPABASE_KEY.trim() : '';
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -35,6 +45,7 @@ app.get('/', (req, res) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="icon" type="image/png" href="/logos/favicon.png">
+        <link rel="manifest" href="/manifest.json">
         <title>Registrador de Ventas</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
@@ -72,6 +83,7 @@ function renderLogin(res, marca, errorMsg = null) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="icon" type="image/png" href="/logos/favicon.png">
+        <link rel="manifest" href="/manifest.json">
         <title>Login - ${titulo}</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
@@ -142,7 +154,7 @@ app.get('/api/productos/buscar', async (req, res) => {
     }
 });
 
-// API Modificar Precio y Stock de un Producto
+// API Modificar Precio y Stock
 app.put('/api/productos/:id/stock', async (req, res) => {
     const { id } = req.params;
     const { precio, stock } = req.body;
@@ -238,7 +250,6 @@ app.post('/api/ordenes', async (req, res) => {
                 precio_unitario: item.precio
             }]);
 
-            // Descontar stock únicamente si entra en estado Finalizado
             if (estado === 'Finalizado') {
                 const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.id).single();
                 if (prod) {
@@ -253,7 +264,7 @@ app.post('/api/ordenes', async (req, res) => {
     }
 });
 
-// API Buscar Orden por Número
+// API Buscar Orden
 app.get('/api/ordenes/buscar/:num', async (req, res) => {
     const { marca } = req.query;
     const num = req.params.num.trim().toUpperCase();
@@ -276,17 +287,15 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
     res.json(orden);
 });
 
-// API Actualizar Orden (Resetea ítems y descuenta stock al pasar a Finalizado)
+// API Actualizar Orden
 app.put('/api/ordenes/:id', async (req, res) => {
     const { id } = req.params;
     const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago, productos } = req.body;
 
     try {
-        // 1. Obtener estado anterior
         const { data: ordenAnterior } = await supabase.from('ordenes').select('estado').eq('id', id).single();
         const estabaFinalizado = ordenAnterior ? ordenAnterior.estado === 'Finalizado' : false;
 
-        // 2. Actualizar la cabecera
         const { error: errUpdate } = await supabase
             .from('ordenes')
             .update({ fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago: metodo_pago || 'Sin especificar' })
@@ -294,7 +303,6 @@ app.put('/api/ordenes/:id', async (req, res) => {
 
         if (errUpdate) throw errUpdate;
 
-        // 3. Reemplazar el detalle de productos
         if (productos && Array.isArray(productos)) {
             await supabase.from('orden_detalles').delete().eq('orden_id', id);
 
@@ -306,7 +314,6 @@ app.put('/api/ordenes/:id', async (req, res) => {
                     precio_unitario: item.precio
                 }]);
 
-                // 4. Si el nuevo estado pasa a "Finalizado" y no lo estaba antes, bajar el stock
                 if (estado === 'Finalizado' && !estabaFinalizado) {
                     const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.id).single();
                     if (prod) {
@@ -322,7 +329,7 @@ app.put('/api/ordenes/:id', async (req, res) => {
     }
 });
 
-// API Exportar a EXCEL (.xlsx) estructurado en Columnas
+// API Exportar EXCEL
 app.get('/api/ordenes/exportar', async (req, res) => {
     const { desde, hasta, marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -356,7 +363,6 @@ app.get('/api/ordenes/exportar', async (req, res) => {
             { header: 'Total ($)', key: 'total', width: 15 }
         ];
 
-        // Formato a encabezados
         worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
         worksheet.getRow(1).fill = {
             type: 'pattern',
