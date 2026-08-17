@@ -474,7 +474,7 @@ async function guardarProductoManual() {
     }
 }
 
-// Imprimir Etiqueta
+// Imprimir Etiqueta con Formato Visual Completo (Logos e Íconos)
 function imprimirEtiqueta() {
     const numOrden = document.getElementById('buscarOrdenInput').value || '#PAN-xxxx';
     const cliente = document.getElementById('cliente_nombre').value || 'Cliente sin especificar';
@@ -485,43 +485,152 @@ function imprimirEtiqueta() {
     const direccion = document.getElementById('direccion_envio').value;
     const horario = document.getElementById('horario_envio').value;
 
-    const vent = window.open('', '_blank', 'width=400,height=600');
+    const esIncanto = MARCA_ACTUAL === 'incanto';
+    const logoSrc = esIncanto ? '/logos/incanto.png' : '/logos/panatech.png';
+    const colorMarca = esIncanto ? '#be123c' : '#0284c7';
+
+    const vent = window.open('', '_blank', 'width=420,height=600');
     vent.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
             <title>Etiqueta ${numOrden}</title>
             <style>
-                body { font-family: monospace; padding: 15px; margin: 0; width: 280px; }
-                .border { border: 2px solid #000; padding: 10px; border-radius: 8px; }
-                .title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 5px; }
-                .brand { font-size: 12px; text-align: center; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 5px; }
-                .field { margin-bottom: 6px; font-size: 12px; }
-                .label { font-weight: bold; }
-                .value { font-size: 13px; }
-                .footer { font-size: 10px; text-align: center; margin-top: 10px; border-top: 1px dashed #000; padding-top: 5px; }
+                * { box-sizing: border-box; }
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+                    padding: 10px; 
+                    margin: 0; 
+                    width: 280px; 
+                    color: #000;
+                }
+                .ticket { 
+                    border: 2px solid ${colorMarca}; 
+                    border-radius: 12px; 
+                    padding: 12px; 
+                    background: #fff;
+                }
+                .header { 
+                    text-align: center; 
+                    border-bottom: 2px dashed #ccc; 
+                    padding-bottom: 8px; 
+                    margin-bottom: 10px; 
+                }
+                .logo { 
+                    max-width: 80px; 
+                    max-height: 40px; 
+                    object-fit: contain; 
+                    margin-bottom: 4px; 
+                }
+                .orden-num { 
+                    font-size: 20px; 
+                    font-weight: 900; 
+                    color: ${colorMarca}; 
+                    letter-spacing: 0.5px; 
+                }
+                .field { 
+                    margin-bottom: 8px; 
+                    font-size: 12px; 
+                    line-height: 1.3; 
+                }
+                .label { 
+                    font-weight: 700; 
+                    color: #475569; 
+                    text-transform: uppercase; 
+                    font-size: 10px; 
+                    display: block; 
+                }
+                .value { 
+                    font-size: 13px; 
+                    font-weight: 600; 
+                    color: #0f172a; 
+                }
+                .badge-modo {
+                    display: inline-block;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    background: ${modo === 'Envio' ? '#e0f2fe' : '#fef3c7'};
+                    color: ${modo === 'Envio' ? '#0369a1' : '#b45309'};
+                    margin-top: 2px;
+                }
+                .obs-box {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-left: 3px solid ${colorMarca};
+                    padding: 6px;
+                    border-radius: 4px;
+                    margin-top: 4px;
+                    font-size: 11px;
+                    font-style: italic;
+                }
+                .footer { 
+                    font-size: 10px; 
+                    text-align: center; 
+                    margin-top: 12px; 
+                    border-top: 1px dashed #ccc; 
+                    padding-top: 6px; 
+                    color: #64748b; 
+                    font-weight: 600;
+                }
             </style>
         </head>
         <body>
-            <div class="border">
-                <div class="title">${numOrden}</div>
-                <div class="brand">${MARCA_ACTUAL}</div>
+            <div class="ticket">
+                <div class="header">
+                    <img src="${logoSrc}" class="logo" alt="${MARCA_ACTUAL}" onerror="this.style.display='none'">
+                    <div class="orden-num">${numOrden}</div>
+                </div>
                 
-                <div class="field"><span class="label">Cliente:</span> <span class="value">${cliente}</span></div>
-                <div class="field"><span class="label">Teléfono:</span> <span class="value">${telefono}</span></div>
-                ${observaciones ? `<div class="field"><span class="label">Obs:</span> <span class="value">${observaciones}</span></div>` : ''}
-                <div class="field"><span class="label">Entrega:</span> <span class="value">${modo === 'Envio' ? '🛵 ENVÍO' : '🛍️ RETIRO'}</span></div>
+                <div class="field">
+                    <span class="label">👤 Cliente</span>
+                    <span class="value">${cliente}</span>
+                </div>
+
+                <div class="field">
+                    <span class="label">📞 Teléfono</span>
+                    <span class="value">${telefono}</span>
+                </div>
+
+                ${observaciones ? `
+                    <div class="field">
+                        <span class="label">📝 Observaciones</span>
+                        <div class="obs-box">${observaciones}</div>
+                    </div>
+                ` : ''}
+
+                <div class="field">
+                    <span class="label">📦 Modo de Entrega</span>
+                    <div class="badge-modo">
+                        ${modo === 'Envio' ? '🛵 ENVÍO A DOMICILIO' : '🛍️ RETIRO EN LOCAL'}
+                    </div>
+                </div>
                 
                 ${modo === 'Envio' ? `
-                    <div class="field"><span class="label">Cadete:</span> <span class="value">${cadete || '-'}</span></div>
-                    <div class="field"><span class="label">Dirección:</span> <span class="value">${direccion || '-'}</span></div>
-                    <div class="field"><span class="label">Horario:</span> <span class="value">${horario || '-'}</span></div>
+                    <div class="field">
+                        <span class="label">🛵 Cadete / Empresa</span>
+                        <span class="value">${cadete || '-'}</span>
+                    </div>
+                    <div class="field">
+                        <span class="label">📍 Dirección</span>
+                        <span class="value">${direccion || '-'}</span>
+                    </div>
+                    <div class="field">
+                        <span class="label">🕒 Horario</span>
+                        <span class="value">${horario || '-'}</span>
+                    </div>
                 ` : ''}
                 
-                <div class="footer">¡Gracias por tu compra!</div>
+                <div class="footer">¡Muchas gracias por tu compra!</div>
             </div>
             <script>
-                window.onload = function() { window.print(); window.close(); }
+                window.onload = function() { 
+                    setTimeout(function() {
+                        window.print(); 
+                        window.close(); 
+                    }, 300);
+                }
             </script>
         </body>
         </html>
