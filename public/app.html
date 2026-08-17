@@ -46,7 +46,6 @@
 
     <!-- Contenido Principal -->
     <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow">
-        <!-- flex-col-reverse en celular ubica los últimos pedidos arriba; en escritorio vuelve a grid de 12 columnas -->
         <div class="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-6">
 
             <!-- Columna Izquierda: Formulario (8 Cols en Escritorio) -->
@@ -81,6 +80,7 @@
                             <select id="estado_pedido" onchange="actualizarColorEstado(this.value)" class="w-full bg-amber-950/80 border border-amber-700 text-amber-300 font-bold rounded-lg p-2 text-xs focus:outline-none transition-colors">
                                 <option value="Iniciado" class="bg-slate-900 text-amber-400" selected>🟡 Iniciado</option>
                                 <option value="Abonado" class="bg-slate-900 text-blue-400">🔵 Abonado</option>
+                                <option value="Preparado" class="bg-slate-900 text-purple-400">🟣 Preparado</option>
                                 <option value="Finalizado" class="bg-slate-900 text-emerald-400">🟢 Finalizado</option>
                                 <option value="Cancelado" class="bg-slate-900 text-rose-400">🔴 Cancelado</option>
                             </select>
@@ -108,7 +108,13 @@
                         </div>
                     </div>
 
-                    <!-- Fila 3: Entrega -->
+                    <!-- Fila 3: Campo Observaciones (Mismo Ancho Completo) -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Observaciones</label>
+                        <input type="text" id="observaciones" placeholder="Ej: Entregar envuelto para regalo, llamar antes..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                    </div>
+
+                    <!-- Fila 4: Entrega -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-900/40 p-3 rounded-xl border border-slate-700/40">
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-400 mb-1">Modo Entrega</label>
@@ -181,7 +187,7 @@
                 </form>
             </div>
 
-            <!-- Columna de Últimas Órdenes (En celular se muestra arriba por flex-col-reverse) -->
+            <!-- Columna de Últimas Órdenes -->
             <div class="lg:col-span-4 space-y-4">
                 <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-2xl shadow-xl">
                     <div class="flex justify-between items-center mb-3">
@@ -251,7 +257,6 @@
                 </div>
             </div>
 
-            <!-- Botones del Modal Móvil-Friendly -->
             <div class="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 pt-2">
                 <button type="button" onclick="volverAtrasStock()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold py-2 px-3 rounded-lg transition text-center">
                     ← Volver Atrás
@@ -293,7 +298,7 @@
         </div>
     </div>
 
-    <!-- Registro del Service Worker para PWA -->
+    <!-- Registro del Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

@@ -219,7 +219,7 @@ app.get('/api/ordenes/ultimas', async (req, res) => {
 
 // API Crear Orden
 app.post('/api/ordenes', async (req, res) => {
-    const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, productos, total, estado, metodo_pago, marca } = req.body;
+    const { fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, productos, total, estado, metodo_pago, marca } = req.body;
 
     try {
         const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -235,7 +235,7 @@ app.post('/api/ordenes', async (req, res) => {
         const { data: orden, error: errOrden } = await supabase
             .from('ordenes')
             .insert([{
-                numero_orden, fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Sin especificar'
+                numero_orden, fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Sin especificar'
             }])
             .select()
             .single();
@@ -290,7 +290,7 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
 // API Actualizar Orden
 app.put('/api/ordenes/:id', async (req, res) => {
     const { id } = req.params;
-    const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago, productos } = req.body;
+    const { fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago, productos } = req.body;
 
     try {
         const { data: ordenAnterior } = await supabase.from('ordenes').select('estado').eq('id', id).single();
@@ -298,7 +298,7 @@ app.put('/api/ordenes/:id', async (req, res) => {
 
         const { error: errUpdate } = await supabase
             .from('ordenes')
-            .update({ fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago: metodo_pago || 'Sin especificar' })
+            .update({ fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago: metodo_pago || 'Sin especificar' })
             .eq('id', id);
 
         if (errUpdate) throw errUpdate;
@@ -357,6 +357,7 @@ app.get('/api/ordenes/exportar', async (req, res) => {
             { header: 'Vendedor', key: 'vendedor', width: 15 },
             { header: 'Cliente', key: 'cliente_nombre', width: 22 },
             { header: 'Teléfono', key: 'cliente_telefono', width: 15 },
+            { header: 'Observaciones', key: 'observaciones', width: 25 },
             { header: 'Método de Pago', key: 'metodo_pago', width: 18 },
             { header: 'Modo Entrega', key: 'modo_entrega', width: 15 },
             { header: 'Estado', key: 'estado', width: 15 },
@@ -377,6 +378,7 @@ app.get('/api/ordenes/exportar', async (req, res) => {
                 vendedor: o.vendedor || '',
                 cliente_nombre: o.cliente_nombre || '',
                 cliente_telefono: o.cliente_telefono || '',
+                observaciones: o.observaciones || '',
                 metodo_pago: o.metodo_pago || 'Sin especificar',
                 modo_entrega: o.modo_entrega || '',
                 estado: o.estado || 'Iniciado',
