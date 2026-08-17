@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     establecerFechaActual();
     cargarUltimasOrdenes();
     renderCarrito();
+    actualizarColorEstado(document.getElementById('estado_pedido').value);
 });
 
 function establecerFechaActual() {
@@ -17,6 +18,23 @@ function establecerFechaActual() {
     const fechaLocal = new Date(hoy.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
     const inputFecha = document.getElementById('fecha');
     if (inputFecha) inputFecha.value = fechaLocal;
+}
+
+function actualizarColorEstado(valor) {
+    const select = document.getElementById('estado_pedido');
+    if (!select) return;
+
+    select.className = "w-full rounded-lg p-2 text-xs font-bold focus:outline-none transition-colors border ";
+    
+    if (valor === 'Iniciado') {
+        select.className += "bg-amber-950/80 border-amber-700 text-amber-300";
+    } else if (valor === 'Abonado') {
+        select.className += "bg-blue-950/80 border-blue-700 text-blue-300";
+    } else if (valor === 'Finalizado') {
+        select.className += "bg-emerald-950/80 border-emerald-700 text-emerald-300";
+    } else if (valor === 'Cancelado') {
+        select.className += "bg-rose-950/80 border-rose-700 text-rose-300";
+    }
 }
 
 function aplicarEstilosMarca() {
@@ -34,36 +52,54 @@ function aplicarEstilosMarca() {
     if (marcaActual === 'incanto') {
         if (brandTitle) {
             brandTitle.innerText = 'INCANTO';
-            brandTitle.className = 'text-xl sm:text-2xl font-black tracking-wider text-rose-400';
+            brandTitle.className = 'text-lg sm:text-2xl font-black tracking-wider text-rose-400';
         }
         if (brandLogo) {
             brandLogo.src = '/logos/incanto.png';
-            brandLogo.onerror = function() {
-                this.src = 'https://cdn-icons-png.flaticon.com/512/891/891462.png';
-            };
+            brandLogo.onerror = function() { this.src = 'https://cdn-icons-png.flaticon.com/512/891/891462.png'; };
         }
         if (submitBtn) submitBtn.className = 'flex-1 sm:flex-none bg-rose-600 hover:bg-rose-500 font-bold py-2.5 px-6 rounded-lg text-white shadow-lg transition text-center';
         if (buscarBtn) buscarBtn.className = 'bg-rose-600 hover:bg-rose-500 px-4 py-2 rounded text-sm font-bold text-white transition';
         if (panelUltimosTitle) panelUltimosTitle.className = 'text-xs font-bold tracking-wider text-rose-400 uppercase';
         if (agregarProdLabel) agregarProdLabel.className = 'block text-xs font-semibold text-rose-400';
-        if (inputVendedor) inputVendedor.className = 'w-full bg-slate-800 border border-slate-700 rounded p-2 text-sm text-rose-300 font-semibold cursor-not-allowed';
+        if (inputVendedor) inputVendedor.className = 'w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-rose-300 font-semibold cursor-not-allowed';
         if (buscarOrdenInput) buscarOrdenInput.placeholder = 'Ej: #INC-1001';
     } else {
         if (brandTitle) {
             brandTitle.innerText = 'PANATECH';
-            brandTitle.className = 'text-xl sm:text-2xl font-black tracking-wider text-sky-400';
+            brandTitle.className = 'text-lg sm:text-2xl font-black tracking-wider text-sky-400';
         }
         if (brandLogo) {
             brandLogo.src = '/logos/panatech.png';
-            brandLogo.onerror = function() {
-                this.src = 'https://cdn-icons-png.flaticon.com/512/891/891462.png';
-            };
+            brandLogo.onerror = function() { this.src = 'https://cdn-icons-png.flaticon.com/512/891/891462.png'; };
         }
         if (buscarOrdenInput) buscarOrdenInput.placeholder = 'Ej: #PAN-1001';
     }
 }
 
-// 1. Cargar Últimas 5 Órdenes
+function mostrarNotificacion(mensaje, tipo = 'exito') {
+    let toast = document.getElementById('toastNotificacion');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toastNotificacion';
+        toast.className = 'fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl font-bold text-xs shadow-2xl transition transform translate-y-10 opacity-0 border';
+        document.body.appendChild(toast);
+    }
+
+    if (tipo === 'exito') {
+        toast.className = 'fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl font-bold text-xs shadow-2xl transition transform translate-y-0 opacity-100 bg-emerald-900 border-emerald-500 text-emerald-200';
+    } else {
+        toast.className = 'fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl font-bold text-xs shadow-2xl transition transform translate-y-0 opacity-100 bg-rose-900 border-rose-500 text-rose-200';
+    }
+
+    toast.innerText = mensaje;
+
+    setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0');
+    }, 3000);
+}
+
+// Cargar Órdenes
 async function cargarUltimasOrdenes() {
     const container = document.getElementById('listaUltimasOrdenes');
     try {
@@ -99,7 +135,7 @@ async function cargarUltimasOrdenes() {
     }
 }
 
-// 2. Buscar Productos
+// Buscar Productos
 async function buscarProductos(query) {
     const resContainer = document.getElementById('prodResults');
 
@@ -108,7 +144,7 @@ async function buscarProductos(query) {
         const productos = await res.json();
 
         if (!productos || productos.length === 0) {
-            resContainer.innerHTML = `<div class="p-3 text-xs text-slate-400 italic">No se encontraron productos para esta marca.</div>`;
+            resContainer.innerHTML = `<div class="p-3 text-xs text-slate-400 italic">No se encontraron productos.</div>`;
         } else {
             resContainer.innerHTML = productos.map(p => `
                 <div onclick="agregarAlCarrito(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${p.variante || ''}', ${p.precio}, ${p.stock})" 
@@ -138,7 +174,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// 3. Gestión del Carrito
+// Carrito
 function agregarAlCarrito(id, nombre, variante, precio, stock) {
     const index = carrito.findIndex(item => item.id === id);
     if (index > -1) {
@@ -205,7 +241,7 @@ function calcularTotal() {
     document.getElementById('totalLabel').innerText = `$${total.toFixed(2)}`;
 }
 
-// 4. Modal Producto Manual
+// Modal Producto Manual
 function abrirModalManual() {
     document.getElementById('modalManual').classList.remove('hidden');
 }
@@ -247,24 +283,25 @@ async function guardarProductoManual() {
     }
 }
 
-// 5. MODAL STOCK Y PRECIOS
+// Modal Stock y Precios
 function abrirModalStock() {
     document.getElementById('modalStock').classList.remove('hidden');
+    volverAtrasStock();
+}
+
+function cerrarModalStock() {
+    document.getElementById('modalStock').classList.add('hidden');
+}
+
+function volverAtrasStock() {
     document.getElementById('buscarStockInput').value = '';
     document.getElementById('resultadosCambioStock').classList.add('hidden');
     document.getElementById('detalleProdEditarStock').classList.add('hidden');
-    
-    const alerta = document.getElementById('alertaStock');
-    if (alerta) alerta.classList.add('hidden');
 
     const btn = document.getElementById('btnGuardarStock');
     btn.disabled = true;
     btn.classList.add('opacity-50', 'cursor-not-allowed');
     btn.classList.remove('hover:bg-amber-500');
-}
-
-function cerrarModalStock() {
-    document.getElementById('modalStock').classList.add('hidden');
 }
 
 async function buscarParaCambiarStock(query) {
@@ -310,9 +347,6 @@ function seleccionarProdParaStock(id, nombre, variante, precioActual, stockActua
     document.getElementById('editProdPrecio').value = precioActual;
     document.getElementById('editProdStock').value = stockActual;
 
-    const alerta = document.getElementById('alertaStock');
-    if (alerta) alerta.classList.add('hidden');
-
     document.getElementById('resultadosCambioStock').classList.add('hidden');
     document.getElementById('buscarStockInput').value = nombre;
     document.getElementById('detalleProdEditarStock').classList.remove('hidden');
@@ -329,7 +363,7 @@ async function guardarNuevoStockCat() {
     const nuevoStock = parseInt(document.getElementById('editProdStock').value);
 
     if (!id || isNaN(nuevoPrecio) || nuevoPrecio < 0 || isNaN(nuevoStock) || nuevoStock < 0) {
-        mostrarAlertaStock('Ingresá valores válidos.', 'error');
+        mostrarNotificacion('Ingresá valores válidos', 'error');
         return;
     }
 
@@ -342,7 +376,7 @@ async function guardarNuevoStockCat() {
         const data = await res.json();
 
         if (data.success) {
-            mostrarAlertaStock('✅ ¡Precio y Stock actualizados con éxito!', 'exito');
+            mostrarNotificacion('✅ ¡Producto actualizado con éxito!', 'exito');
             
             const index = carrito.findIndex(item => item.id == id);
             if (index > -1) {
@@ -351,32 +385,16 @@ async function guardarNuevoStockCat() {
                 renderCarrito();
             }
 
-            setTimeout(() => {
-                cerrarModalStock();
-            }, 1500);
+            setTimeout(() => { cerrarModalStock(); }, 1200);
         } else {
-            mostrarAlertaStock('❌ Error: ' + (data.error || 'No se pudo actualizar'), 'error');
+            mostrarNotificacion('❌ Error al actualizar', 'error');
         }
     } catch (err) {
-        mostrarAlertaStock('❌ Error de conexión con el servidor.', 'error');
+        mostrarNotificacion('❌ Error de conexión', 'error');
     }
 }
 
-function mostrarAlertaStock(mensaje, tipo) {
-    const alerta = document.getElementById('alertaStock');
-    if (!alerta) return;
-
-    alerta.innerText = mensaje;
-    alerta.classList.remove('hidden', 'bg-emerald-950', 'text-emerald-400', 'border-emerald-700', 'bg-rose-950', 'text-rose-400', 'border-rose-700');
-
-    if (tipo === 'exito') {
-        alerta.classList.add('bg-emerald-950', 'text-emerald-400', 'border', 'border-emerald-700');
-    } else {
-        alerta.classList.add('bg-rose-950', 'text-rose-400', 'border', 'border-rose-700');
-    }
-}
-
-// 6. MODAL EXPORTAR CSV CON FECHAS
+// Modal Exportar Excel
 function abrirModalExportar() {
     const hoy = new Date().toISOString().split('T')[0];
     const primerDiaMes = new Date();
@@ -405,7 +423,7 @@ function descargarCSVFiltrado() {
     cerrarModalExportar();
 }
 
-// 7. Guardar Orden
+// Guardar / Actualizar Orden
 async function guardarOrden(e) {
     e.preventDefault();
     if (carrito.length === 0) {
@@ -452,19 +470,19 @@ async function guardarOrden(e) {
                 document.getElementById('modalNumOrden').innerText = data.numero_orden;
                 document.getElementById('modalExito').classList.remove('hidden');
             } else {
-                alert('Orden actualizada con éxito.');
+                mostrarNotificacion('✅ ¡Orden actualizada correctamente!', 'exito');
             }
             limpiarFormulario();
             cargarUltimasOrdenes();
         } else {
-            alert('Error al guardar la orden: ' + data.error);
+            mostrarNotificacion('❌ Error al guardar la orden', 'error');
         }
     } catch (err) {
-        alert('Error de red al conectar con el servidor.');
+        mostrarNotificacion('❌ Error de red al conectar con el servidor', 'error');
     }
 }
 
-// 8. Buscar Orden
+// Buscar Orden
 function buscarOrdenDirecta(numeroOrden) {
     document.getElementById('buscarOrdenInput').value = numeroOrden;
     buscarOrden();
@@ -494,7 +512,9 @@ async function buscarOrden() {
         document.getElementById('cliente_telefono').value = orden.cliente_telefono || '';
         document.getElementById('modo_entrega').value = orden.modo_entrega;
         document.getElementById('estado_pedido').value = orden.estado || 'Iniciado';
-        document.getElementById('metodo_pago').value = orden.metodo_pago || 'Efectivo';
+        actualizarColorEstado(orden.estado || 'Iniciado');
+        
+        document.getElementById('metodo_pago').value = orden.metodo_pago || 'Sin especificar';
         
         toggleEnvioFields();
         if (orden.modo_entrega === 'Envio') {
@@ -520,7 +540,6 @@ async function buscarOrden() {
     }
 }
 
-// 9. Reiniciar Formulario
 function limpiarFormulario() {
     document.getElementById('ordenForm').reset();
     document.getElementById('ordenId').value = '';
@@ -529,7 +548,9 @@ function limpiarFormulario() {
     
     document.getElementById('vendedor').value = usuarioLogueado;
     document.getElementById('estado_pedido').value = 'Iniciado';
-    document.getElementById('metodo_pago').value = 'Efectivo';
+    actualizarColorEstado('Iniciado');
+    
+    document.getElementById('metodo_pago').value = 'Sin especificar';
 
     carrito = [];
     renderCarrito();
@@ -541,9 +562,10 @@ function cerrarModal() {
     document.getElementById('modalExito').classList.add('hidden');
 }
 
-// 10. Función para Generar e Imprimir la Etiqueta (Usa URLs Directas CDN para Garantizar Visibilidad en Vercel)
+// Imprimir Etiqueta con Teléfono Incluido
 function imprimirEtiqueta() {
     const clienteNombre = document.getElementById('cliente_nombre').value.trim();
+    const clienteTelefono = document.getElementById('cliente_telefono').value.trim();
     const modoEntrega = document.getElementById('modo_entrega').value;
     const metodoPago = document.getElementById('metodo_pago').value;
     const direccion = document.getElementById('direccion_envio').value.trim();
@@ -557,14 +579,12 @@ function imprimirEtiqueta() {
 
     const esIncanto = marcaActual === 'incanto';
     
-    // Logos de marca e íconos con fallback asegurado
     const logoImg = esIncanto ? '/logos/incanto.png' : '/logos/panatech.png';
     const colorFranja = esIncanto ? '#e8d5e0' : '#dbeafe'; 
     const colorTextoFooter = esIncanto ? '#4a154b' : '#0369a1';
-    const telefono = esIncanto ? '341 696-4783' : '341 300-1081';
+    const telefonoLocal = esIncanto ? '341 696-4783' : '341 300-1081';
     const instagram = esIncanto ? '@incanto.rosario' : '@panatech.rosario';
 
-    // SVG Incrustados Directos para WhatsApp e Instagram (Asegura visibilidad 100% en Vercel)
     const waIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="#25D366" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>`;
     const igIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="#E1306C" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>`;
 
@@ -592,101 +612,24 @@ function imprimirEtiqueta() {
             <meta charset="UTF-8">
             <title>Etiqueta - ${clienteNombre}</title>
             <style>
-                @page { 
-                    size: 80mm auto; 
-                    margin: 0; 
-                }
-                * {
-                    box-sizing: border-box;
-                    margin: 0;
-                    padding: 0;
-                }
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    width: 76mm;
-                    margin: 0 auto;
-                    background: #fff;
-                    color: #1a1a1a;
-                }
-                .tarjeta-container {
-                    padding: 12px 12px 0 12px;
-                    position: relative;
-                }
-                .header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    margin-bottom: 18px;
-                }
-                .titulo-container {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                }
-                .titulo {
-                    font-family: 'Georgia', serif;
-                    font-size: 16px;
-                    font-weight: bold;
-                    letter-spacing: -0.3px;
-                }
-                .sparkles {
-                    font-size: 12px;
-                }
-                .logo {
-                    width: 50px;
-                    height: 50px;
-                    border-radius: 50%;
-                    object-fit: cover;
-                }
-                .cuerpo {
-                    margin-bottom: 20px;
-                }
-                .campo {
-                    display: flex;
-                    align-items: baseline;
-                    gap: 6px;
-                    font-size: 13px;
-                    margin-top: 8px;
-                }
-                .label {
-                    font-family: 'Georgia', serif;
-                    font-weight: bold;
-                    font-size: 13px;
-                    min-width: 65px;
-                }
-                .valor {
-                    font-size: 13px;
-                    font-weight: 600;
-                }
-                .linea-punteada {
-                    border-bottom: 1.5px dotted #666;
-                    margin-top: 2px;
-                    margin-bottom: 12px;
-                    width: 100%;
-                }
-                .footer-franja {
-                    background-color: ${colorFranja};
-                    color: ${colorTextoFooter};
-                    padding: 8px 10px;
-                    margin-top: 10px;
-                    font-size: 11px;
-                    font-weight: 500;
-                }
-                .footer-top {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 4px;
-                }
-                .footer-bottom {
-                    text-align: center;
-                    margin-top: 2px;
-                }
-                .icon-text {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 4px;
-                }
+                @page { size: 80mm auto; margin: 0; }
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; width: 76mm; margin: 0 auto; background: #fff; color: #1a1a1a; }
+                .tarjeta-container { padding: 12px 12px 0 12px; position: relative; }
+                .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+                .titulo-container { display: flex; align-items: center; gap: 4px; }
+                .titulo { font-family: 'Georgia', serif; font-size: 16px; font-weight: bold; letter-spacing: -0.3px; }
+                .sparkles { font-size: 12px; }
+                .logo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+                .cuerpo { margin-bottom: 20px; }
+                .campo { display: flex; align-items: baseline; gap: 6px; font-size: 13px; margin-top: 8px; }
+                .label { font-family: 'Georgia', serif; font-weight: bold; font-size: 13px; min-width: 65px; }
+                .valor { font-size: 13px; font-weight: 600; }
+                .linea-punteada { border-bottom: 1.5px dotted #666; margin-top: 2px; margin-bottom: 12px; width: 100%; }
+                .footer-franja { background-color: ${colorFranja}; color: ${colorTextoFooter}; padding: 8px 10px; margin-top: 10px; font-size: 11px; font-weight: 500; }
+                .footer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+                .footer-bottom { text-align: center; margin-top: 2px; }
+                .icon-text { display: inline-flex; align-items: center; gap: 4px; }
             </style>
         </head>
         <body>
@@ -706,6 +649,12 @@ function imprimirEtiqueta() {
                     </div>
                     <div class="linea-punteada"></div>
 
+                    <div class="campo">
+                        <span class="label">Teléfono:</span>
+                        <span class="valor">${clienteTelefono || 'S/T'}</span>
+                    </div>
+                    <div class="linea-punteada"></div>
+
                     ${camposEnvioDebajoNombre}
 
                     <div class="campo">
@@ -719,16 +668,10 @@ function imprimirEtiqueta() {
             <div class="footer-franja">
                 <div class="footer-top">
                     <span class="icon-text">📍 Callao 1255 11 E, Rosario</span>
-                    <span class="icon-text">
-                        ${waIconSvg} 
-                        ${telefono}
-                    </span>
+                    <span class="icon-text">${waIconSvg} ${telefonoLocal}</span>
                 </div>
                 <div class="footer-bottom">
-                    <span class="icon-text">
-                        ${igIconSvg} 
-                        ${instagram}
-                    </span>
+                    <span class="icon-text">${igIconSvg} ${instagram}</span>
                 </div>
             </div>
 

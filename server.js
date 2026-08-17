@@ -2,20 +2,18 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
+const ExcelJS = require('exceljs');
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🟢 Servir carpeta estática con path absoluto para compatibilidad con Vercel
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Conexión a Supabase
 const supabaseUrl = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim() : '';
 const supabaseKey = process.env.SUPABASE_KEY ? process.env.SUPABASE_KEY.trim() : '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Credenciales de Usuario por Marca
 const USUARIOS = {
     panatech: {
         'npanadisi': 'Asdasdasd123!',
@@ -24,12 +22,11 @@ const USUARIOS = {
         'bprimo': 'Austra2706!'
     },
     incanto: {
-        'npanadisi': 'Asdasdasd123!',
+        'npanadisi': 'Asdasdasd123',
         'bprimo': 'Austra2706!'
     }
 };
 
-// 1. Pantalla Inicial (Selección de Marca)
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html>
@@ -37,6 +34,7 @@ app.get('/', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="icon" type="image/png" href="/logos/favicon.png">
         <title>Registrador de Ventas</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
@@ -59,7 +57,6 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Función auxiliar para renderizar el Login
 function renderLogin(res, marca, errorMsg = null) {
     const brand = marca.toLowerCase();
     const esPanatech = brand === 'panatech';
@@ -74,6 +71,7 @@ function renderLogin(res, marca, errorMsg = null) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="icon" type="image/png" href="/logos/favicon.png">
         <title>Login - ${titulo}</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
@@ -102,7 +100,6 @@ function renderLogin(res, marca, errorMsg = null) {
     `);
 }
 
-// 2. Rutas de Login
 app.get('/login/:marca', (req, res) => renderLogin(res, req.params.marca));
 
 app.post('/login/:marca', (req, res) => {
@@ -117,7 +114,7 @@ app.post('/login/:marca', (req, res) => {
     }
 });
 
-// 🔍 API 1: Buscar Productos por Marca
+// API Buscar Productos
 app.get('/api/productos/buscar', async (req, res) => {
     const { q, marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -141,12 +138,11 @@ app.get('/api/productos/buscar', async (req, res) => {
 
         res.json((data || []).slice(0, 15));
     } catch (err) {
-        console.error('Error al buscar productos:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-// 📦 API 1.1: Actualizar Precio y Stock de un Producto en Supabase
+// API Modificar Precio y Stock de un Producto
 app.put('/api/productos/:id/stock', async (req, res) => {
     const { id } = req.params;
     const { precio, stock } = req.body;
@@ -161,14 +157,13 @@ app.put('/api/productos/:id/stock', async (req, res) => {
             .eq('id', id);
 
         if (error) throw error;
-        res.json({ success: true, mensaje: 'Precio y stock actualizados en Supabase.' });
+        res.json({ success: true, mensaje: 'Precio y stock actualizados correctamente.' });
     } catch (err) {
-        console.error('Error al actualizar producto:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// ➕ API 2: Cargar Producto Manual
+// API Crear Producto Manual
 app.post('/api/productos/manual', async (req, res) => {
     const { nombre, variante, precio, stock, marca } = req.body;
     try {
@@ -189,7 +184,7 @@ app.post('/api/productos/manual', async (req, res) => {
     }
 });
 
-// 📋 API 3: Obtener Últimas 5 Órdenes
+// API Últimas Órdenes
 app.get('/api/ordenes/ultimas', async (req, res) => {
     const { marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -206,19 +201,17 @@ app.get('/api/ordenes/ultimas', async (req, res) => {
         if (error) throw error;
         res.json(data || []);
     } catch (err) {
-        console.error('Error al traer últimas órdenes:', err.message);
         res.json([]);
     }
 });
 
-// 📝 API 4: Crear Nueva Orden
+// API Crear Orden
 app.post('/api/ordenes', async (req, res) => {
     const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, productos, total, estado, metodo_pago, marca } = req.body;
 
     try {
         const marcaTarget = (marca || 'panatech').toLowerCase();
-        const esIncanto = marcaTarget === 'incanto';
-        const prefijo = esIncanto ? '#INC' : '#PAN';
+        const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
 
         const { count } = await supabase
             .from('ordenes')
@@ -230,7 +223,7 @@ app.post('/api/ordenes', async (req, res) => {
         const { data: orden, error: errOrden } = await supabase
             .from('ordenes')
             .insert([{
-                numero_orden, fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Efectivo'
+                numero_orden, fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Sin especificar'
             }])
             .select()
             .single();
@@ -245,9 +238,12 @@ app.post('/api/ordenes', async (req, res) => {
                 precio_unitario: item.precio
             }]);
 
-            const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.id).single();
-            if (prod) {
-                await supabase.from('productos').update({ stock: Math.max(0, prod.stock - item.cantidad) }).eq('id', item.id);
+            // Descontar stock únicamente si entra en estado Finalizado
+            if (estado === 'Finalizado') {
+                const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.id).single();
+                if (prod) {
+                    await supabase.from('productos').update({ stock: Math.max(0, prod.stock - item.cantidad) }).eq('id', item.id);
+                }
             }
         }
 
@@ -257,7 +253,7 @@ app.post('/api/ordenes', async (req, res) => {
     }
 });
 
-// 🔎 API 5: Buscar Orden Exclusiva por Marca
+// API Buscar Orden por Número
 app.get('/api/ordenes/buscar/:num', async (req, res) => {
     const { marca } = req.query;
     const num = req.params.num.trim().toUpperCase();
@@ -280,22 +276,53 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
     res.json(orden);
 });
 
-// ✏️ API 6: Actualizar Orden
+// API Actualizar Orden (Resetea ítems y descuenta stock al pasar a Finalizado)
 app.put('/api/ordenes/:id', async (req, res) => {
     const { id } = req.params;
-    const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago } = req.body;
+    const { fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago, productos } = req.body;
 
-    const { data, error } = await supabase
-        .from('ordenes')
-        .update({ fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago })
-        .eq('id', id)
-        .select();
+    try {
+        // 1. Obtener estado anterior
+        const { data: ordenAnterior } = await supabase.from('ordenes').select('estado').eq('id', id).single();
+        const estabaFinalizado = ordenAnterior ? ordenAnterior.estado === 'Finalizado' : false;
 
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, data });
+        // 2. Actualizar la cabecera
+        const { error: errUpdate } = await supabase
+            .from('ordenes')
+            .update({ fecha, vendedor, cliente_nombre, cliente_telefono, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago: metodo_pago || 'Sin especificar' })
+            .eq('id', id);
+
+        if (errUpdate) throw errUpdate;
+
+        // 3. Reemplazar el detalle de productos
+        if (productos && Array.isArray(productos)) {
+            await supabase.from('orden_detalles').delete().eq('orden_id', id);
+
+            for (const item of productos) {
+                await supabase.from('orden_detalles').insert([{
+                    orden_id: id,
+                    producto_id: item.id,
+                    cantidad: item.cantidad,
+                    precio_unitario: item.precio
+                }]);
+
+                // 4. Si el nuevo estado pasa a "Finalizado" y no lo estaba antes, bajar el stock
+                if (estado === 'Finalizado' && !estabaFinalizado) {
+                    const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.id).single();
+                    if (prod) {
+                        await supabase.from('productos').update({ stock: Math.max(0, prod.stock - item.cantidad) }).eq('id', item.id);
+                    }
+                }
+            }
+        }
+
+        res.json({ success: true, mensaje: 'Orden y productos actualizados correctamente.' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
-// 📊 API 7: Exportar CSV Filtrado por Fechas
+// API Exportar a EXCEL (.xlsx) estructurado en Columnas
 app.get('/api/ordenes/exportar', async (req, res) => {
     const { desde, hasta, marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -314,16 +341,48 @@ app.get('/api/ordenes/exportar', async (req, res) => {
 
         if (error) return res.status(500).json({ error: error.message });
 
-        let csvContent = "\uFEFFNumero Orden,Fecha,Vendedor,Cliente,Telefono,Metodo Pago,Entrega,Estado,Total\n";
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Ventas');
+
+        worksheet.columns = [
+            { header: 'N° Orden', key: 'numero_orden', width: 15 },
+            { header: 'Fecha', key: 'fecha', width: 12 },
+            { header: 'Vendedor', key: 'vendedor', width: 15 },
+            { header: 'Cliente', key: 'cliente_nombre', width: 22 },
+            { header: 'Teléfono', key: 'cliente_telefono', width: 15 },
+            { header: 'Método de Pago', key: 'metodo_pago', width: 18 },
+            { header: 'Modo Entrega', key: 'modo_entrega', width: 15 },
+            { header: 'Estado', key: 'estado', width: 15 },
+            { header: 'Total ($)', key: 'total', width: 15 }
+        ];
+
+        // Formato a encabezados
+        worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
+        worksheet.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: marcaTarget === 'incanto' ? 'BE123C' : '0284C7' }
+        };
 
         ordenes.forEach(o => {
-            const fechaStr = new Date(o.fecha).toLocaleDateString('es-AR');
-            csvContent += `"${o.numero_orden}","${fechaStr}","${o.vendedor || ''}","${o.cliente_nombre || ''}","${o.cliente_telefono || ''}","${o.metodo_pago || 'Efectivo'}","${o.modo_entrega || ''}","${o.estado || 'Iniciado'}",${o.total}\n`;
+            worksheet.addRow({
+                numero_orden: o.numero_orden,
+                fecha: new Date(o.fecha).toLocaleDateString('es-AR'),
+                vendedor: o.vendedor || '',
+                cliente_nombre: o.cliente_nombre || '',
+                cliente_telefono: o.cliente_telefono || '',
+                metodo_pago: o.metodo_pago || 'Sin especificar',
+                modo_entrega: o.modo_entrega || '',
+                estado: o.estado || 'Iniciado',
+                total: parseFloat(o.total) || 0
+            });
         });
 
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename=ventas_${marcaTarget}_${desde}_al_${hasta}.csv`);
-        res.status(200).send(csvContent);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=ventas_${marcaTarget}_${desde}_al_${hasta}.xlsx`);
+
+        await workbook.xlsx.write(res);
+        res.end();
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
