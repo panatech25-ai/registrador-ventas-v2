@@ -246,7 +246,13 @@ async function buscarOrden() {
         }
 
         document.getElementById('ordenId').value = data.id;
-        document.getElementById('fecha').value = data.fecha;
+        
+        // Formatear correctamente la fecha para input type="date" (YYYY-MM-DD)
+        if (data.fecha) {
+            const fechaLimpia = data.fecha.split('T')[0];
+            document.getElementById('fecha').value = fechaLimpia;
+        }
+
         document.getElementById('vendedor').value = data.vendedor || USUARIO_ACTUAL;
         document.getElementById('cliente_nombre').value = data.cliente_nombre || '';
         document.getElementById('cliente_telefono').value = data.cliente_telefono || '';
@@ -262,6 +268,12 @@ async function buscarOrden() {
         actualizarColorEstado(est);
 
         document.getElementById('metodo_pago').value = data.metodo_pago || 'Sin especificar';
+
+        // Cambiar el texto del botón a "Actualizar Orden"
+        const submitBtn = document.getElementById('submitBtn');
+        if (submitBtn) {
+            submitBtn.textContent = 'Actualizar Orden';
+        }
 
         toggleEnvioFields();
 
@@ -329,6 +341,13 @@ function limpiarFormulario() {
     document.getElementById('estado_pedido').value = 'Iniciado';
     actualizarColorEstado('Iniciado');
     document.getElementById('metodo_pago').value = 'Sin especificar';
+    
+    // Restaurar el texto del botón a "Confirmar Orden"
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) {
+        submitBtn.textContent = 'Confirmar Orden';
+    }
+
     carrito = [];
     renderCarrito();
     toggleEnvioFields();
