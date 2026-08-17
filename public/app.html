@@ -3,8 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Configuración PWA y Favicon -->
+    <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/logos/favicon.png">
     <link rel="shortcut icon" href="/logos/favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/logos/favicon.png">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <title>Registrador de Ventas</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -285,6 +293,16 @@
         </div>
     </div>
 
+    <!-- Registro del Service Worker para PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker PWA listo:', reg.scope))
+                    .catch(err => console.error('Error al registrar Service Worker:', err));
+            });
+        }
+    </script>
     <script src="/app.js"></script>
 </body>
 </html>
