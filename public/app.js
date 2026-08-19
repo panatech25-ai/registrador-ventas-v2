@@ -70,6 +70,25 @@ function toggleEnvioFields() {
     }
 }
 
+// Abrir chat directo de WhatsApp con el cliente
+function abrirWhatsAppCliente() {
+    const rawTel = document.getElementById('cliente_telefono').value;
+    if (!rawTel || rawTel.trim() === '') {
+        alert('Ingresá un número de teléfono primero.');
+        return;
+    }
+
+    // Limpiar caracteres no numéricos
+    let numLimpio = rawTel.replace(/\D/g, '');
+
+    // Asumir código de país Argentina (54) si no está incluido
+    if (!numLimpio.startsWith('54')) {
+        numLimpio = '54' + numLimpio;
+    }
+
+    window.open(`https://wa.me/${numLimpio}`, '_blank');
+}
+
 async function buscarProductos(query) {
     const resDiv = document.getElementById('prodResults');
     if (!query || query.trim().length === 0) {
@@ -247,7 +266,6 @@ async function buscarOrden() {
 
         document.getElementById('ordenId').value = data.id;
         
-        // Formatear correctamente la fecha para input type="date" (YYYY-MM-DD)
         if (data.fecha) {
             const fechaLimpia = data.fecha.split('T')[0];
             document.getElementById('fecha').value = fechaLimpia;
@@ -269,7 +287,6 @@ async function buscarOrden() {
 
         document.getElementById('metodo_pago').value = data.metodo_pago || 'Sin especificar';
 
-        // Cambiar el texto del botón a "Actualizar Orden"
         const submitBtn = document.getElementById('submitBtn');
         if (submitBtn) {
             submitBtn.textContent = 'Actualizar Orden';
@@ -342,7 +359,6 @@ function limpiarFormulario() {
     actualizarColorEstado('Iniciado');
     document.getElementById('metodo_pago').value = 'Sin especificar';
     
-    // Restaurar el texto del botón a "Confirmar Orden"
     const submitBtn = document.getElementById('submitBtn');
     if (submitBtn) {
         submitBtn.textContent = 'Confirmar Orden';
@@ -474,11 +490,10 @@ async function guardarProductoManual() {
     }
 }
 
-// Imprimir Etiqueta con Formato Visual Completo y Redes Sociales (Sin Cadete)
+// Imprimir Etiqueta con Vista Previa y Disparo Directo de Impresión (Sin Observaciones)
 function imprimirEtiqueta() {
     const cliente = document.getElementById('cliente_nombre').value || 'Cliente sin especificar';
     const telefono = document.getElementById('cliente_telefono').value || 'Sin teléfono';
-    const observaciones = document.getElementById('observaciones').value || '';
     const modo = document.getElementById('modo_entrega').value;
     const direccion = document.getElementById('direccion_envio').value;
     const horario = document.getElementById('horario_envio').value;
@@ -487,7 +502,6 @@ function imprimirEtiqueta() {
     const logoSrc = esIncanto ? '/logos/incanto.png' : '/logos/panatech.png';
     const colorMarca = esIncanto ? '#be123c' : '#0284c7';
 
-    // Cuentas de Instagram y Dirección según la marca
     const igAccount = esIncanto ? 'incanto.rosario' : 'panatech.rosario';
     const direccionLocal = 'Callao 1255 11E, Rosario';
 
@@ -559,16 +573,6 @@ function imprimirEtiqueta() {
                     color: ${modo === 'Envio' ? '#0369a1' : '#b45309'};
                     margin-top: 2px;
                 }
-                .obs-box {
-                    background: #f8fafc;
-                    border: 1px solid #e2e8f0;
-                    border-left: 3px solid ${colorMarca};
-                    padding: 6px;
-                    border-radius: 4px;
-                    margin-top: 4px;
-                    font-size: 11px;
-                    font-style: italic;
-                }
                 .footer { 
                     font-size: 10px; 
                     margin-top: 12px; 
@@ -585,9 +589,29 @@ function imprimirEtiqueta() {
                     align-items: center;
                     gap: 6px;
                 }
+                .print-bar {
+                    margin-bottom: 10px;
+                    text-align: center;
+                }
+                .btn-imprimir {
+                    background: ${colorMarca};
+                    color: #fff;
+                    border: none;
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    font-weight: bold;
+                    font-size: 11px;
+                    cursor: pointer;
+                }
+                @media print {
+                    .print-bar { display: none; }
+                }
             </style>
         </head>
         <body>
+            <div class="print-bar">
+                <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Etiqueta</button>
+            </div>
             <div class="ticket">
                 <div class="header">
                     <img src="${logoSrc}" class="logo" alt="${MARCA_ACTUAL}" onerror="this.style.display='none'">
@@ -605,13 +629,6 @@ function imprimirEtiqueta() {
                         ${telefono}
                     </span>
                 </div>
-
-                ${observaciones ? `
-                    <div class="field">
-                        <span class="label">📝 Observaciones</span>
-                        <div class="obs-box">${observaciones}</div>
-                    </div>
-                ` : ''}
 
                 <div class="field">
                     <span class="label">📦 Modo de Entrega</span>
@@ -646,7 +663,6 @@ function imprimirEtiqueta() {
                 window.onload = function() { 
                     setTimeout(function() {
                         window.print(); 
-                        window.close(); 
                     }, 300);
                 }
             </script>

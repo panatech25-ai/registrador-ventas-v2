@@ -55,7 +55,7 @@
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
                     <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Gestión de Orden</span>
                     <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <input type="text" id="buscarOrdenInput" class="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 w-full sm:w-48 focus:outline-none focus:border-slate-400">
+                        <input type="text" id="buscarOrdenInput" placeholder="#PAN-1001" class="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 w-full sm:w-48 focus:outline-none focus:border-slate-400">
                         <button type="button" id="buscarBtn" onclick="buscarOrden()" class="bg-sky-600 hover:bg-sky-500 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition">
                             Buscar
                         </button>
@@ -96,7 +96,7 @@
                         </div>
                     </div>
 
-                    <!-- Fila 2: Cliente Datos -->
+                    <!-- Fila 2: Cliente Datos con WhatsApp Directo -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-400 mb-1">Nombre Cliente</label>
@@ -104,11 +104,16 @@
                         </div>
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-400 mb-1">Teléfono Cliente</label>
-                            <input type="text" id="cliente_telefono" placeholder="Ej: 341 1234567" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                            <div class="relative flex items-center">
+                                <input type="text" id="cliente_telefono" placeholder="Ej: 3411234567" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 pr-9 text-xs text-white focus:outline-none">
+                                <button type="button" onclick="abrirWhatsAppCliente()" title="Abrir WhatsApp con el cliente" class="absolute right-2 p-1 text-emerald-400 hover:text-emerald-300 transition">
+                                    <img src="/logos/whatsapp.png" class="w-5 h-5 object-contain" alt="WhatsApp" onerror="this.src='https://cdn-icons-png.flaticon.com/512/733/733585.png'">
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Fila 3: Campo Observaciones (Mismo Ancho Completo) -->
+                    <!-- Fila 3: Campo Observaciones -->
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-400 mb-1">Observaciones</label>
                         <input type="text" id="observaciones" placeholder="Ej: Entregar envuelto para regalo, llamar antes..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
@@ -298,7 +303,7 @@
         </div>
     </div>
 
-    <!-- Registro del Service Worker -->
+    <!-- Registro del Service Worker para PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
