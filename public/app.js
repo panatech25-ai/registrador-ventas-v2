@@ -86,23 +86,27 @@ function abrirWhatsAppCliente() {
     window.open(`https://wa.me/${numLimpio}`, '_blank');
 }
 
-// Enviar WhatsApp con datos del pedido al cadete/mensajería
+// Enviar WhatsApp con datos del pedido al cadete/mensajería (Formato Completo con Emojis)
 function enviarWhatsappCadete() {
     const cliente = document.getElementById('cliente_nombre').value || 'Sin especificar';
     const direccion = document.getElementById('direccion_envio').value || 'Sin especificar';
+    const horario = document.getElementById('horario_envio').value || 'Sin especificar';
     const telefono = document.getElementById('cliente_telefono').value || 'Sin especificar';
     const metodoPago = document.getElementById('metodo_pago').value || 'Sin especificar';
+    const observaciones = document.getElementById('observaciones').value || 'Sin observaciones';
     
     const subtotal = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
     const costoEnvio = parseFloat(document.getElementById('costo_envio').value) || 0;
     const totalPedido = subtotal + costoEnvio;
 
-    const mensaje = `--- *Nuevo envio* ---\n` +
-                    `*Nombre Cliente:* ${cliente}\n` +
-                    `*Direccion Envio:* ${direccion}\n` +
-                    `*Telefono Cliente:* ${telefono}\n` +
-                    `*Metodo de Pago:* ${metodoPago}\n` +
-                    `*TOTAL PEDIDO:* $${totalPedido.toFixed(2)} ($${costoEnvio.toFixed(2)} Costo Envio)`;
+    const mensaje = `🛵 *--- Nuevo envio ---*\n` +
+                    `👤 *Nombre Cliente:* ${cliente}\n` +
+                    `📍 *Direccion Envio:* ${direccion}\n` +
+                    `🕒 *Horario:* ${horario}\n` +
+                    `📞 *Telefono Cliente:* ${telefono}\n` +
+                    `💳 *Metodo de Pago:* ${metodoPago}\n` +
+                    `📝 *Observaciones:* ${observaciones}\n` +
+                    `💰 *TOTAL PEDIDO:* $${totalPedido.toFixed(2)} ($${costoEnvio.toFixed(2)} Costo Envio)`;
 
     const cadeteInput = document.getElementById('cadete').value.trim();
     let numCadeteLimpio = cadeteInput.replace(/\D/g, '');
