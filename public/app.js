@@ -78,15 +78,43 @@ function abrirWhatsAppCliente() {
         return;
     }
 
-    // Limpiar caracteres no numéricos
     let numLimpio = rawTel.replace(/\D/g, '');
-
-    // Asumir código de país Argentina (54) si no está incluido
     if (!numLimpio.startsWith('54')) {
         numLimpio = '54' + numLimpio;
     }
 
     window.open(`https://wa.me/${numLimpio}`, '_blank');
+}
+
+// Enviar WhatsApp con datos del pedido al cadete/mensajería
+function enviarWhatsappCadete() {
+    const cliente = document.getElementById('cliente_nombre').value || 'Sin especificar';
+    const direccion = document.getElementById('direccion_envio').value || 'Sin especificar';
+    const telefono = document.getElementById('cliente_telefono').value || 'Sin especificar';
+    const metodoPago = document.getElementById('metodo_pago').value || 'Sin especificar';
+    
+    const subtotal = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+    const costoEnvio = parseFloat(document.getElementById('costo_envio').value) || 0;
+    const totalPedido = subtotal + costoEnvio;
+
+    const mensaje = `--- *Nuevo envio* ---\n` +
+                    `*Nombre Cliente:* ${cliente}\n` +
+                    `*Direccion Envio:* ${direccion}\n` +
+                    `*Telefono Cliente:* ${telefono}\n` +
+                    `*Metodo de Pago:* ${metodoPago}\n` +
+                    `*TOTAL PEDIDO:* $${totalPedido.toFixed(2)} ($${costoEnvio.toFixed(2)} Costo Envio)`;
+
+    const cadeteInput = document.getElementById('cadete').value.trim();
+    let numCadeteLimpio = cadeteInput.replace(/\D/g, '');
+
+    if (numCadeteLimpio.length >= 8) {
+        if (!numCadeteLimpio.startsWith('54')) {
+            numCadeteLimpio = '54' + numCadeteLimpio;
+        }
+        window.open(`https://wa.me/${numCadeteLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    } else {
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`, '_blank');
+    }
 }
 
 async function buscarProductos(query) {

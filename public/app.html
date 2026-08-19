@@ -130,11 +130,16 @@
                         </div>
                     </div>
 
-                    <!-- Campos Condicionales de Envío -->
+                    <!-- Campos Condicionales de Envío con Botón de Sobre -->
                     <div id="envioFields" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/70 p-3 rounded-xl border border-slate-700/80">
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-400 mb-1">Cadete / Empresa</label>
-                            <input type="text" id="cadete" placeholder="Ej: PedidosYa" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                            <div class="relative flex items-center">
+                                <input type="text" id="cadete" placeholder="Ej: PedidosYa o N° Teléfono" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 pr-9 text-xs text-white focus:outline-none">
+                                <button type="button" onclick="enviarWhatsappCadete()" title="Enviar WhatsApp con datos del envío" class="absolute right-2 p-1 text-sky-400 hover:text-sky-300 transition text-sm">
+                                    📩
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-400 mb-1">Dirección Envío</label>
