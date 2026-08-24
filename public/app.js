@@ -498,7 +498,7 @@ async function buscarParaCambiarStock(q) {
 
 function seleccionarProdParaStock(p) {
     document.getElementById('editStockProdId').value = p.id;
-    document.getElementById('editStockProdNombre').textContent = p.nombre;
+    document.getElementById('editProdNombre').value = p.nombre || '';
     document.getElementById('editStockProdVariante').textContent = `Variante: ${p.variante || 'N/A'}`;
     document.getElementById('editProdPrecio').value = p.precio;
     document.getElementById('editProdStock').value = p.stock;
@@ -521,22 +521,28 @@ function volverAtrasStock() {
 
 async function guardarNuevoStockCat() {
     const id = document.getElementById('editStockProdId').value;
+    const nombre = document.getElementById('editProdNombre').value;
     const precio = document.getElementById('editProdPrecio').value;
     const stock = document.getElementById('editProdStock').value;
+
+    if (!nombre || nombre.trim() === '') {
+        alert('El nombre del producto no puede estar vacío.');
+        return;
+    }
 
     const res = await fetch(`/api/productos/${id}/stock`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ precio, stock })
+        body: JSON.stringify({ nombre, precio, stock })
     });
 
     const data = await res.json();
     if (data.success) {
-        alert('Producto actualizado.');
+        alert('Producto actualizado correctamente.');
         volverAtrasStock();
         cerrarModalStock();
     } else {
-        alert('Error al actualizar.');
+        alert('Error al actualizar el producto.');
     }
 }
 

@@ -263,7 +263,7 @@
     <div id="modalStock" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
         <div class="bg-slate-800 border border-slate-700 p-4 sm:p-6 rounded-2xl max-w-md w-full space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-2">
-                <h3 class="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider">Actualizar Precio y Stock</h3>
+                <h3 class="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider">Actualizar Producto, Precio y Stock</h3>
                 <button onclick="cerrarModalStock()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
             </div>
 
@@ -272,21 +272,22 @@
                 <div id="resultadosCambioStock" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-48 overflow-y-auto"></div>
             </div>
 
-            <!-- Editor de Stock -->
+            <!-- Editor de Stock y Nombre -->
             <div id="detalleProdEditarStock" class="hidden bg-slate-900/80 p-3 sm:p-4 rounded-xl border border-slate-700/80 space-y-3">
                 <input type="hidden" id="editStockProdId">
                 <div>
-                    <div id="editStockProdNombre" class="font-bold text-xs text-white"></div>
-                    <div id="editStockProdVariante" class="text-[10px] text-slate-400"></div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Nombre del Producto</label>
+                    <input type="text" id="editProdNombre" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
                 </div>
+                <div id="editStockProdVariante" class="text-[10px] text-slate-400 font-semibold"></div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[10px] text-slate-400 mb-1">Precio ($)</label>
-                        <input type="number" step="0.01" id="editProdPrecio" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white">
+                        <input type="number" step="0.01" id="editProdPrecio" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
                     </div>
                     <div>
                         <label class="block text-[10px] text-slate-400 mb-1">Stock</label>
-                        <input type="number" id="editProdStock" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white">
+                        <input type="number" id="editProdStock" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
                     </div>
                 </div>
             </div>
