@@ -154,22 +154,24 @@ app.get('/api/productos/buscar', async (req, res) => {
     }
 });
 
-// API Modificar Precio y Stock
+// API Modificar Nombre, Precio y Stock
 app.put('/api/productos/:id/stock', async (req, res) => {
     const { id } = req.params;
-    const { precio, stock } = req.body;
+    const { nombre, precio, stock } = req.body;
 
     try {
+        const updateData = {};
+        if (nombre !== undefined && nombre.trim() !== '') updateData.nombre = nombre.trim();
+        if (precio !== undefined) updateData.precio = parseFloat(precio);
+        if (stock !== undefined) updateData.stock = parseInt(stock);
+
         const { data, error } = await supabase
             .from('productos')
-            .update({ 
-                precio: parseFloat(precio),
-                stock: parseInt(stock) 
-            })
+            .update(updateData)
             .eq('id', id);
 
         if (error) throw error;
-        res.json({ success: true, mensaje: 'Precio y stock actualizados correctamente.' });
+        res.json({ success: true, mensaje: 'Producto actualizado correctamente.' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }

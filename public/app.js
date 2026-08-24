@@ -363,9 +363,10 @@ async function buscarOrden() {
 
         toggleEnvioFields();
 
+        // Carga dinámica del nombre del producto actualizado del catálogo conservando el precio guardado
         carrito = (data.orden_detalles || []).map(d => ({
             id: d.producto_id,
-            nombre: d.productos ? d.productos.nombre : 'Producto',
+            nombre: (d.productos && d.productos.nombre) ? d.productos.nombre : 'Producto',
             variante: d.productos ? d.productos.variante : '',
             precio: parseFloat(d.precio_unitario),
             cantidad: d.cantidad
