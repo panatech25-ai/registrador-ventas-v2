@@ -86,7 +86,7 @@ function abrirWhatsAppCliente() {
     window.open(`https://wa.me/${numLimpio}`, '_blank');
 }
 
-// Enviar WhatsApp con datos del pedido al cadete/mensajería (Formato Completo con Emojis)
+// Enviar WhatsApp con datos del pedido al cadete/mensajería
 function enviarWhatsappCadete() {
     const cliente = document.getElementById('cliente_nombre').value || 'Sin especificar';
     const direccion = document.getElementById('direccion_envio').value || 'Sin especificar';
@@ -340,18 +340,27 @@ async function buscarOrden() {
     }
 }
 
+// Cargar pedidos filtrados por el estado seleccionado
 async function cargarUltimasOrdenes() {
     const list = document.getElementById('listaUltimasOrdenes');
+    const filtroSelect = document.getElementById('filtroEstadoLista');
+    const estadoFiltro = filtroSelect ? filtroSelect.value : 'TODOS';
+
     try {
         const res = await fetch(`/api/ordenes/ultimas?marca=${MARCA_ACTUAL}`);
         const ordenes = await res.json();
 
-        if (ordenes.length === 0) {
-            list.innerHTML = '<p class="text-xs text-slate-500 italic">Sin pedidos registrados.</p>';
+        // Filtrar por el estado si no es "TODOS"
+        const ordenesFiltradas = estadoFiltro === 'TODOS' 
+            ? ordenes 
+            : ordenes.filter(o => o.estado === estadoFiltro);
+
+        if (ordenesFiltradas.length === 0) {
+            list.innerHTML = `<p class="text-xs text-slate-500 italic p-2">Sin pedidos ${estadoFiltro !== 'TODOS' ? `en estado '${estadoFiltro}'` : ''}.</p>`;
             return;
         }
 
-        list.innerHTML = ordenes.map(o => {
+        list.innerHTML = ordenesFiltradas.map(o => {
             let colorEstado = 'bg-amber-950 text-amber-400 border-amber-700';
             if (o.estado === 'Abonado') colorEstado = 'bg-blue-950 text-blue-400 border-blue-700';
             if (o.estado === 'Preparado') colorEstado = 'bg-purple-950 text-purple-400 border-purple-700';
@@ -522,13 +531,18 @@ async function guardarProductoManual() {
     }
 }
 
-// Imprimir Etiqueta con Vista Previa y Disparo Directo de Impresión (Sin Observaciones)
+// Imprimir Etiqueta (con Total del Pedido y Desglose)
 function imprimirEtiqueta() {
     const cliente = document.getElementById('cliente_nombre').value || 'Cliente sin especificar';
     const telefono = document.getElementById('cliente_telefono').value || 'Sin teléfono';
     const modo = document.getElementById('modo_entrega').value;
     const direccion = document.getElementById('direccion_envio').value;
     const horario = document.getElementById('horario_envio').value;
+
+    // Calcular montos desde el carrito y costo de envío
+    const subtotal = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+    const costoEnvio = parseFloat(document.getElementById('costo_envio').value) || 0;
+    const total = subtotal + costoEnvio;
 
     const esIncanto = MARCA_ACTUAL === 'incanto';
     const logoSrc = esIncanto ? '/logos/incanto.png' : '/logos/panatech.png';
@@ -537,7 +551,7 @@ function imprimirEtiqueta() {
     const igAccount = esIncanto ? 'incanto.rosario' : 'panatech.rosario';
     const direccionLocal = 'Callao 1255 11E, Rosario';
 
-    const vent = window.open('', '_blank', 'width=420,height=600');
+    const vent = window.open('', '_blank', 'width=420,height=650');
     vent.document.write(`
         <!DOCTYPE html>
         <html>
@@ -605,9 +619,28 @@ function imprimirEtiqueta() {
                     color: ${modo === 'Envio' ? '#0369a1' : '#b45309'};
                     margin-top: 2px;
                 }
+                .total-box {
+                    border-top: 2px dashed #ccc;
+                    margin-top: 10px;
+                    padding-top: 8px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .total-title {
+                    font-size: 11px;
+                    font-weight: 800;
+                    color: #334155;
+                    text-transform: uppercase;
+                }
+                .total-monto {
+                    font-size: 16px;
+                    font-weight: 900;
+                    color: ${colorMarca};
+                }
                 .footer { 
                     font-size: 10px; 
-                    margin-top: 12px; 
+                    margin-top: 10px; 
                     border-top: 1px dashed #ccc; 
                     padding-top: 8px; 
                     color: #475569; 
@@ -679,6 +712,15 @@ function imprimirEtiqueta() {
                         <span class="value">${horario || '-'}</span>
                     </div>
                 ` : ''}
+
+                <!-- Muestra del Total del Pedido -->
+                <div class="total-box">
+                    <div>
+                        <div class="total-title">Total a Pagar</div>
+                        ${modo === 'Envio' && costoEnvio > 0 ? `<div style="font-size: 9px; color: #64748b;">(Inc. envío $${costoEnvio.toFixed(2)})</div>` : ''}
+                    </div>
+                    <div class="total-monto">$${total.toFixed(2)}</div>
+                </div>
                 
                 <div class="footer">
                     <div class="footer-item">

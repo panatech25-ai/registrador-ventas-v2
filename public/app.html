@@ -29,7 +29,7 @@
                 </div>
             </div>
 
-            <!-- Botones Superiores Adaptados a Móviles -->
+            <!-- Botones Superiores -->
             <div class="flex items-center gap-1.5 sm:gap-2">
                 <button type="button" onclick="abrirModalStock()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1">
                     🏷️ <span class="hidden sm:inline">Stock / Precios</span><span class="sm:hidden">Stock</span>
@@ -48,10 +48,10 @@
     <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow">
         <div class="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-6">
 
-            <!-- Columna Izquierda: Formulario (8 Cols en Escritorio) -->
+            <!-- Columna Izquierda: Formulario (8 Cols) -->
             <div class="lg:col-span-8 bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-6">
                 
-                <!-- Buscador de Orden / Header del Formulario -->
+                <!-- Buscador de Orden -->
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
                     <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Gestión de Orden</span>
                     <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -113,7 +113,7 @@
                         </div>
                     </div>
 
-                    <!-- Fila 3: Campo Observaciones -->
+                    <!-- Fila 3: Observaciones -->
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-400 mb-1">Observaciones</label>
                         <input type="text" id="observaciones" placeholder="Ej: Entregar envuelto para regalo, llamar antes..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
@@ -130,7 +130,7 @@
                         </div>
                     </div>
 
-                    <!-- Campos Condicionales de Envío con Botón de Sobre -->
+                    <!-- Campos Condicionales de Envío -->
                     <div id="envioFields" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/70 p-3 rounded-xl border border-slate-700/80">
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-400 mb-1">Cadete / Empresa</label>
@@ -197,14 +197,24 @@
                 </form>
             </div>
 
-            <!-- Columna de Últimas Órdenes -->
+            <!-- Columna de Últimas Órdenes con Filtro por Estado -->
             <div class="lg:col-span-4 space-y-4">
                 <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-2xl shadow-xl">
-                    <div class="flex justify-between items-center mb-3">
-                        <h2 id="panelUltimosTitle" class="text-xs font-bold tracking-wider text-sky-400 uppercase">Últimos Pedidos</h2>
-                        <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white">🔄 Actualizar</button>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <h2 id="panelUltimosTitle" class="text-xs font-bold tracking-wider text-sky-400 uppercase">Pedidos</h2>
+                        <div class="flex items-center gap-1">
+                            <select id="filtroEstadoLista" onchange="cargarUltimasOrdenes()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
+                                <option value="TODOS">📋 Todos</option>
+                                <option value="Iniciado">🟡 Iniciado</option>
+                                <option value="Abonado">🔵 Abonado</option>
+                                <option value="Preparado">🟣 Preparado</option>
+                                <option value="Finalizado">🟢 Finalizado</option>
+                                <option value="Cancelado">🔴 Cancelado</option>
+                            </select>
+                            <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white p-1" title="Actualizar">🔄</button>
+                        </div>
                     </div>
-                    <div id="listaUltimasOrdenes" class="space-y-2">
+                    <div id="listaUltimasOrdenes" class="space-y-2 max-h-[600px] overflow-y-auto pr-1">
                         <p class="text-xs text-slate-500 italic">Cargando...</p>
                     </div>
                 </div>
@@ -235,7 +245,7 @@
         </div>
     </div>
 
-    <!-- Modal Stock y Precios Adaptado -->
+    <!-- Modal Stock y Precios -->
     <div id="modalStock" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
         <div class="bg-slate-800 border border-slate-700 p-4 sm:p-6 rounded-2xl max-w-md w-full space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-2">
@@ -308,7 +318,7 @@
         </div>
     </div>
 
-    <!-- Registro del Service Worker para PWA -->
+    <!-- Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
