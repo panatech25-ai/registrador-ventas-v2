@@ -66,8 +66,35 @@ function toggleEnvioFields() {
     } else {
         envioFields.classList.add('hidden');
         document.getElementById('costo_envio').value = 0;
+        const chkP = document.getElementById('chk_prod_abonado');
+        const chkT = document.getElementById('chk_abonado_total');
+        if (chkP) chkP.checked = false;
+        if (chkT) chkT.checked = false;
         calcularTotal();
     }
+}
+
+// Asegurar que solo uno de los checkboxes de pago esté activo a la vez
+function seleccionarPagoEnvio(idSeleccionado) {
+    const chkProd = document.getElementById('chk_prod_abonado');
+    const chkTotal = document.getElementById('chk_abonado_total');
+
+    if (idSeleccionado === 'chk_prod_abonado' && chkProd.checked) {
+        chkTotal.checked = false;
+    } else if (idSeleccionado === 'chk_abonado_total' && chkTotal.checked) {
+        chkProd.checked = false;
+    }
+}
+
+// Formateador seguro de fechas para evitar desfase por Zona Horaria (UTC-3)
+function formatearFechaVista(fechaRaw) {
+    if (!fechaRaw) return 'S/D';
+    const fechaLimpia = fechaRaw.split('T')[0];
+    const partes = fechaLimpia.split('-');
+    if (partes.length === 3) {
+        return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    return fechaLimpia;
 }
 
 // Abrir chat directo de WhatsApp con el cliente
@@ -99,12 +126,22 @@ function enviarWhatsappCadete() {
     const costoEnvio = parseFloat(document.getElementById('costo_envio').value) || 0;
     const totalPedido = subtotal + costoEnvio;
 
+    let estadoPagoTexto = "";
+    const chkTotal = document.getElementById('chk_abonado_total');
+    const chkProd = document.getElementById('chk_prod_abonado');
+
+    if (chkTotal && chkTotal.checked) {
+        estadoPagoTexto = " (ABONADO EL TOTAL)";
+    } else if (chkProd && chkProd.checked) {
+        estadoPagoTexto = " (PRODUCTO ABONADO, COBRAR SOLO ENVÍO)";
+    }
+
     const mensaje = `🛵 *--- Nuevo envio ---*\n` +
                     `👤 *Nombre Cliente:* ${cliente}\n` +
                     `📍 *Direccion Envio:* ${direccion}\n` +
                     `🕒 *Horario:* ${horario}\n` +
                     `📞 *Telefono Cliente:* ${telefono}\n` +
-                    `💳 *Metodo de Pago:* ${metodoPago}\n` +
+                    `💳 *Metodo de Pago:* ${metodoPago}${estadoPagoTexto}\n` +
                     `📝 *Observaciones:* ${observaciones}\n` +
                     `💰 *TOTAL PEDIDO:* $${totalPedido.toFixed(2)} ($${costoEnvio.toFixed(2)} Costo Envio)`;
 
@@ -340,7 +377,7 @@ async function buscarOrden() {
     }
 }
 
-// Cargar pedidos filtrados por el estado seleccionado
+// Cargar pedidos con la fecha formateada correctamente
 async function cargarUltimasOrdenes() {
     const list = document.getElementById('listaUltimasOrdenes');
     const filtroSelect = document.getElementById('filtroEstadoLista');
@@ -350,7 +387,6 @@ async function cargarUltimasOrdenes() {
         const res = await fetch(`/api/ordenes/ultimas?marca=${MARCA_ACTUAL}`);
         const ordenes = await res.json();
 
-        // Filtrar por el estado si no es "TODOS"
         const ordenesFiltradas = estadoFiltro === 'TODOS' 
             ? ordenes 
             : ordenes.filter(o => o.estado === estadoFiltro);
@@ -371,7 +407,7 @@ async function cargarUltimasOrdenes() {
                 <div onclick="cargarOrdenEnFormulario('${o.numero_orden}')" class="p-2.5 bg-slate-900/80 hover:bg-slate-900 rounded-xl border border-slate-700/80 cursor-pointer transition flex justify-between items-center text-xs">
                     <div>
                         <div class="font-black text-white">${o.numero_orden} <span class="font-normal text-slate-400 text-[10px]">- ${o.cliente_nombre || 'S/D'}</span></div>
-                        <div class="text-[10px] text-slate-400">${new Date(o.fecha).toLocaleDateString('es-AR')}</div>
+                        <div class="text-[10px] text-slate-400">${formatearFechaVista(o.fecha)}</div>
                     </div>
                     <div class="text-right">
                         <span class="text-[9px] px-2 py-0.5 rounded-full border ${colorEstado} font-bold">${o.estado}</span>
@@ -400,6 +436,11 @@ function limpiarFormulario() {
     actualizarColorEstado('Iniciado');
     document.getElementById('metodo_pago').value = 'Sin especificar';
     
+    const chkP = document.getElementById('chk_prod_abonado');
+    const chkT = document.getElementById('chk_abonado_total');
+    if (chkP) chkP.checked = false;
+    if (chkT) chkT.checked = false;
+
     const submitBtn = document.getElementById('submitBtn');
     if (submitBtn) {
         submitBtn.textContent = 'Confirmar Orden';
@@ -531,7 +572,7 @@ async function guardarProductoManual() {
     }
 }
 
-// Imprimir Etiqueta (con Total del Pedido y Desglose)
+// Imprimir Etiqueta con Estados de Pago Personalizados
 function imprimirEtiqueta() {
     const cliente = document.getElementById('cliente_nombre').value || 'Cliente sin especificar';
     const telefono = document.getElementById('cliente_telefono').value || 'Sin teléfono';
@@ -539,10 +580,28 @@ function imprimirEtiqueta() {
     const direccion = document.getElementById('direccion_envio').value;
     const horario = document.getElementById('horario_envio').value;
 
-    // Calcular montos desde el carrito y costo de envío
+    const chkProdAbonado = document.getElementById('chk_prod_abonado') ? document.getElementById('chk_prod_abonado').checked : false;
+    const chkAbonadoTotal = document.getElementById('chk_abonado_total') ? document.getElementById('chk_abonado_total').checked : false;
+
     const subtotal = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
     const costoEnvio = parseFloat(document.getElementById('costo_envio').value) || 0;
-    const total = subtotal + costoEnvio;
+    const totalCompleto = subtotal + costoEnvio;
+
+    let etiquetaTexto = "";
+    let montoMostrar = totalCompleto;
+    let subtituloMonto = "";
+
+    if (chkAbonadoTotal) {
+        etiquetaTexto = `<div class="badge-abonado">ABONADO</div>`;
+        montoMostrar = 0;
+        subtituloMonto = "(Abonado $0.00)";
+    } else if (chkProdAbonado) {
+        etiquetaTexto = `<div class="badge-prod-abonado">PRODUCTO ABONADO</div>`;
+        montoMostrar = costoEnvio;
+        subtituloMonto = "(Cobrar solo envío)";
+    } else if (modo === 'Envio' && costoEnvio > 0) {
+        subtituloMonto = `(Inc. envío $${costoEnvio.toFixed(2)})`;
+    }
 
     const esIncanto = MARCA_ACTUAL === 'incanto';
     const logoSrc = esIncanto ? '/logos/incanto.png' : '/logos/panatech.png';
@@ -618,6 +677,28 @@ function imprimirEtiqueta() {
                     background: ${modo === 'Envio' ? '#e0f2fe' : '#fef3c7'};
                     color: ${modo === 'Envio' ? '#0369a1' : '#b45309'};
                     margin-top: 2px;
+                }
+                .badge-abonado {
+                    display: inline-block;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    font-weight: 900;
+                    background: #dcfce7;
+                    color: #15803d;
+                    border: 1px solid #16a34a;
+                    margin-top: 4px;
+                }
+                .badge-prod-abonado {
+                    display: inline-block;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    font-weight: 900;
+                    background: #fef3c7;
+                    color: #b45309;
+                    border: 1px solid #d97706;
+                    margin-top: 4px;
                 }
                 .total-box {
                     border-top: 2px dashed #ccc;
@@ -700,6 +781,7 @@ function imprimirEtiqueta() {
                     <div class="badge-modo">
                         ${modo === 'Envio' ? '🛵 ENVÍO A DOMICILIO' : '🛍️ RETIRO EN LOCAL'}
                     </div>
+                    ${etiquetaTexto ? `<div>${etiquetaTexto}</div>` : ''}
                 </div>
                 
                 ${modo === 'Envio' ? `
@@ -713,13 +795,13 @@ function imprimirEtiqueta() {
                     </div>
                 ` : ''}
 
-                <!-- Muestra del Total del Pedido -->
+                <!-- Muestra del Total a Cobrar -->
                 <div class="total-box">
                     <div>
-                        <div class="total-title">Total a Pagar</div>
-                        ${modo === 'Envio' && costoEnvio > 0 ? `<div style="font-size: 9px; color: #64748b;">(Inc. envío $${costoEnvio.toFixed(2)})</div>` : ''}
+                        <div class="total-title">Total a Cobrar</div>
+                        ${subtituloMonto ? `<div style="font-size: 9px; color: #64748b;">${subtituloMonto}</div>` : ''}
                     </div>
-                    <div class="total-monto">$${total.toFixed(2)}</div>
+                    <div class="total-monto">$${montoMostrar.toFixed(2)}</div>
                 </div>
                 
                 <div class="footer">

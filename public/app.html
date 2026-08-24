@@ -130,30 +130,44 @@
                         </div>
                     </div>
 
-                    <!-- Campos Condicionales de Envío -->
-                    <div id="envioFields" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/70 p-3 rounded-xl border border-slate-700/80">
-                        <div>
-                            <label class="block text-[11px] font-semibold text-slate-400 mb-1">Cadete / Empresa</label>
-                            <div class="relative flex items-center">
-                                <input type="text" id="cadete" placeholder="Ej: PedidosYa o N° Teléfono" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 pr-9 text-xs text-white focus:outline-none">
-                                <button type="button" onclick="enviarWhatsappCadete()" title="Enviar WhatsApp con datos del envío" class="absolute right-2 p-1 text-sky-400 hover:text-sky-300 transition text-sm">
-                                    📩
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-semibold text-slate-400 mb-1">Dirección Envío</label>
-                            <input type="text" id="direccion_envio" placeholder="Calle y N°" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
+                    <!-- Campos Condicionales de Envío con Checkboxes de Pago -->
+                    <div id="envioFields" class="hidden space-y-3 bg-slate-900/70 p-3 rounded-xl border border-slate-700/80">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
-                                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Costo Envío</label>
-                                <input type="number" id="costo_envio" value="0" oninput="calcularTotal()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Cadete / Empresa</label>
+                                <div class="relative flex items-center">
+                                    <input type="text" id="cadete" placeholder="Ej: PedidosYa o N° Teléfono" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 pr-9 text-xs text-white focus:outline-none">
+                                    <button type="button" onclick="enviarWhatsappCadete()" title="Enviar WhatsApp con datos del envío" class="absolute right-2 p-1 text-sky-400 hover:text-sky-300 transition text-sm">
+                                        📩
+                                    </button>
+                                </div>
                             </div>
                             <div>
-                                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Horario</label>
-                                <input type="text" id="horario_envio" placeholder="14 a 18 hs" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Dirección Envío</label>
+                                <input type="text" id="direccion_envio" placeholder="Calle y N°" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
                             </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Costo Envío</label>
+                                    <input type="number" id="costo_envio" value="0" oninput="calcularTotal()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Horario</label>
+                                    <input type="text" id="horario_envio" placeholder="14 a 18 hs" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Checkboxes Estado de Pago de Envío -->
+                        <div class="flex flex-col sm:flex-row gap-3 pt-1 border-t border-slate-800 text-xs">
+                            <label class="flex items-center gap-2 text-amber-300 font-semibold cursor-pointer">
+                                <input type="checkbox" id="chk_prod_abonado" onchange="seleccionarPagoEnvio('chk_prod_abonado')" class="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-0">
+                                <span>Producto abonado, falta envío</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-emerald-300 font-semibold cursor-pointer">
+                                <input type="checkbox" id="chk_abonado_total" onchange="seleccionarPagoEnvio('chk_abonado_total')" class="rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-0">
+                                <span>Abonado el total</span>
+                            </label>
                         </div>
                     </div>
 
