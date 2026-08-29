@@ -92,7 +92,7 @@
 
     <!-- Contenido Principal -->
     <main class="max-w-7xl mx-auto px-4 py-4 w-full flex-grow">
-        <div class="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-6">
+        <div class="flex flex-col lg:grid lg:grid-cols-12 gap-6">
 
             <!-- Columna Izquierda: Formulario (8 Cols) -->
             <div class="lg:col-span-8 bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5">
@@ -262,28 +262,57 @@
                 </form>
             </div>
 
-            <!-- Columna de Últimas Órdenes con Acciones Rápidas -->
+            <!-- Columna de Últimas Órdenes con Acciones Rápidas (Colapsable en Móvil) -->
             <div class="lg:col-span-4 space-y-4">
                 <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-2xl shadow-xl">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                    <!-- Header con botón colapsable para móvil -->
+                    <div class="flex items-center justify-between gap-2 cursor-pointer lg:cursor-default select-none" onclick="toggleListaPedidosMovil()">
                         <div class="flex items-center gap-2">
                             <h2 id="panelUltimosTitle" class="text-xs font-bold tracking-wider text-sky-400 uppercase">Pedidos Recientes</h2>
                             <span id="contadorOrdenes" class="text-[10px] bg-slate-900 px-2 py-0.5 rounded-full border border-slate-700 text-slate-400 font-semibold">0</span>
                         </div>
-                        <div class="flex items-center gap-1">
-                            <select id="filtroEstadoLista" onchange="cargarUltimasOrdenes()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
-                                <option value="TODOS">📋 Todos</option>
-                                <option value="Iniciado">🟡 Iniciado</option>
-                                <option value="Abonado">🔵 Abonado</option>
-                                <option value="Preparado">🟣 Preparado</option>
-                                <option value="Finalizado">🟢 Finalizado</option>
-                                <option value="Cancelado">🔴 Cancelado</option>
-                            </select>
-                            <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white p-1" title="Actualizar">🔄</button>
+                        <div class="flex items-center gap-2">
+                            <!-- Indicador desplegable sólo visible en móvil -->
+                            <span id="iconoDesplegableMovil" class="lg:hidden text-xs text-sky-300 font-bold bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1 shadow-sm">
+                                📋 Ver Pedidos ▼
+                            </span>
+                            
+                            <!-- Filtros en Desktop -->
+                            <div class="hidden lg:flex items-center gap-1" onclick="event.stopPropagation()">
+                                <select id="filtroEstadoLista" onchange="cargarUltimasOrdenes()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
+                                    <option value="TODOS">📋 Todos</option>
+                                    <option value="Iniciado">🟡 Iniciado</option>
+                                    <option value="Abonado">🔵 Abonado</option>
+                                    <option value="Preparado">🟣 Preparado</option>
+                                    <option value="Finalizado">🟢 Finalizado</option>
+                                    <option value="Cancelado">🔴 Cancelado</option>
+                                </select>
+                                <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white p-1" title="Actualizar">🔄</button>
+                            </div>
                         </div>
                     </div>
-                    <div id="listaUltimasOrdenes" class="space-y-2 max-h-[620px] overflow-y-auto pr-1">
-                        <p class="text-xs text-slate-500 italic">Cargando...</p>
+
+                    <!-- Contenedor Desplegable (Oculto en móvil por defecto, visible en Desktop) -->
+                    <div id="contenedorListaPedidosMovil" class="hidden lg:block mt-3 space-y-3 pt-3 border-t border-slate-700/60">
+                        <!-- Filtros en Móvil -->
+                        <div class="flex lg:hidden items-center justify-between gap-2 pb-1 bg-slate-900/40 p-2 rounded-xl border border-slate-700/40">
+                            <span class="text-[11px] text-slate-400 font-semibold">Estado:</span>
+                            <div class="flex items-center gap-1">
+                                <select id="filtroEstadoListaMovil" onchange="sincronizarFiltroMovil(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
+                                    <option value="TODOS">📋 Todos</option>
+                                    <option value="Iniciado">🟡 Iniciado</option>
+                                    <option value="Abonado">🔵 Abonado</option>
+                                    <option value="Preparado">🟣 Preparado</option>
+                                    <option value="Finalizado">🟢 Finalizado</option>
+                                    <option value="Cancelado">🔴 Cancelado</option>
+                                </select>
+                                <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white p-1" title="Actualizar">🔄</button>
+                            </div>
+                        </div>
+
+                        <div id="listaUltimasOrdenes" class="space-y-2 max-h-[620px] overflow-y-auto pr-1">
+                            <p class="text-xs text-slate-500 italic">Cargando...</p>
+                        </div>
                     </div>
                 </div>
             </div>

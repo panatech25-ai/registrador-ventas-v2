@@ -491,13 +491,46 @@ async function buscarOrden() {
 }
 
 // ==========================================
-// LISTADO DE ÓRDENES Y ACCIONES RÁPIDAS
+// LISTADO DE ÓRDENES Y ACCIONES RÁPIDAS (CON DESPLEGABLE EN MÓVIL)
 // ==========================================
+function toggleListaPedidosMovil() {
+    if (window.innerWidth >= 1024) return;
+    const container = document.getElementById('contenedorListaPedidosMovil');
+    const icono = document.getElementById('iconoDesplegableMovil');
+    if (!container) return;
+
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        if (icono) icono.innerHTML = '📋 Ocultar ▲';
+        // Scroll suave hacia la lista al abrir
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+        container.classList.add('hidden');
+        if (icono) icono.innerHTML = '📋 Ver Pedidos ▼';
+    }
+}
+
+function sincronizarFiltroMovil(val) {
+    const filtroDesk = document.getElementById('filtroEstadoLista');
+    if (filtroDesk) filtroDesk.value = val;
+    cargarUltimasOrdenes();
+}
+
 async function cargarUltimasOrdenes() {
     const list = document.getElementById('listaUltimasOrdenes');
-    const filtroSelect = document.getElementById('filtroEstadoLista');
+    const filtroSelectDesk = document.getElementById('filtroEstadoLista');
+    const filtroSelectMovil = document.getElementById('filtroEstadoListaMovil');
     const contador = document.getElementById('contadorOrdenes');
-    const estadoFiltro = filtroSelect ? filtroSelect.value : 'TODOS';
+    
+    let estadoFiltro = 'TODOS';
+    if (filtroSelectDesk) {
+        estadoFiltro = filtroSelectDesk.value;
+        if (filtroSelectMovil && filtroSelectMovil.value !== estadoFiltro) {
+            filtroSelectMovil.value = estadoFiltro;
+        }
+    } else if (filtroSelectMovil) {
+        estadoFiltro = filtroSelectMovil.value;
+    }
 
     try {
         const res = await fetch(`/api/ordenes/ultimas?marca=${MARCA_ACTUAL}&limite=30`);
