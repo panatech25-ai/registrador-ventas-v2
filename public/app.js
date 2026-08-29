@@ -2,15 +2,70 @@ let carrito = [];
 let params = new URLSearchParams(window.location.search);
 let MARCA_ACTUAL = (params.get('marca') || 'panatech').toLowerCase();
 let USUARIO_ACTUAL = params.get('usuario') || 'vendedor';
+let ultimasOrdenesMemoria = [];
+let html5QrCodeScanner = null;
+let ultimaOrdenGuardada = null;
 
+// ==========================================
+// INICIALIZACIÓN
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     configurarMarcaUI();
     document.getElementById('fecha').valueAsDate = new Date();
     document.getElementById('vendedor').value = USUARIO_ACTUAL;
     cargarUltimasOrdenes();
+    cargarMetricasHoy();
     actualizarColorEstado('Iniciado');
+
+    // Inicializar fechas por defecto del modal de exportación
+    const hoyStr = new Date().toISOString().split('T')[0];
+    const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    if (document.getElementById('exportFechaInicio')) document.getElementById('exportFechaInicio').value = primerDiaMes;
+    if (document.getElementById('exportFechaFin')) document.getElementById('exportFechaFin').value = hoyStr;
 });
 
+// ==========================================
+// SISTEMA DE NOTIFICACIONES TOAST (Reemplaza alert)
+// ==========================================
+function showToast(mensaje, tipo = 'success') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'pointer-events-auto flex items-center gap-2.5 p-3 rounded-xl shadow-2xl text-xs font-semibold text-white border toast-animate-in';
+
+    let icon = '✅';
+    let bgBorder = 'bg-slate-900/95 border-emerald-500/80 text-emerald-300';
+
+    if (tipo === 'error') {
+        icon = '❌';
+        bgBorder = 'bg-slate-900/95 border-rose-500/80 text-rose-300';
+    } else if (tipo === 'warning') {
+        icon = '⚠️';
+        bgBorder = 'bg-slate-900/95 border-amber-500/80 text-amber-300';
+    } else if (tipo === 'info') {
+        icon = 'ℹ️';
+        bgBorder = 'bg-slate-900/95 border-sky-500/80 text-sky-300';
+    }
+
+    toast.className += ` ${bgBorder}`;
+    toast.innerHTML = `
+        <span class="text-base">${icon}</span>
+        <span class="flex-1">${mensaje}</span>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.remove('toast-animate-in');
+        toast.classList.add('toast-animate-out');
+        setTimeout(() => toast.remove(), 220);
+    }, 3200);
+}
+
+// ==========================================
+// CONFIGURACIÓN DE MARCA UI
+// ==========================================
 function configurarMarcaUI() {
     const esIncanto = MARCA_ACTUAL === 'incanto';
     const logoImg = document.getElementById('brandLogo');
@@ -24,19 +79,50 @@ function configurarMarcaUI() {
         if (logoImg) logoImg.src = '/logos/incanto.png';
         if (title) {
             title.textContent = 'INCANTO';
-            title.className = 'text-lg sm:text-2xl font-black tracking-wider text-rose-500';
+            title.className = 'text-base sm:text-2xl font-black tracking-wider text-rose-500 leading-none';
         }
         if (submitBtn) submitBtn.className = 'flex-1 sm:flex-none bg-rose-600 hover:bg-rose-500 font-bold py-2.5 px-6 rounded-lg text-white shadow-lg transition text-center text-xs';
-        if (buscarBtn) buscarBtn.className = 'bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition';
+        if (buscarBtn) buscarBtn.className = 'bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition shadow';
         if (panelTitle) panelTitle.className = 'text-xs font-bold tracking-wider text-rose-400 uppercase';
         if (agregarLabel) agregarLabel.className = 'block text-xs font-semibold text-rose-400 uppercase tracking-wider';
     } else {
         if (logoImg) logoImg.src = '/logos/panatech.png';
         if (title) {
             title.textContent = 'PANATECH';
-            title.className = 'text-lg sm:text-2xl font-black tracking-wider text-sky-400';
+            title.className = 'text-base sm:text-2xl font-black tracking-wider text-sky-400 leading-none';
         }
     }
+}
+
+// ==========================================
+// MINI-DASHBOARD DE MÉTRICAS DIARIAS
+// ==========================================
+async function cargarMetricasHoy() {
+    try {
+        const res = await fetch(`/api/metricas/hoy?marca=${MARCA_ACTUAL}`);
+        const data = await res.json();
+
+        const elVentas = document.getElementById('kpiVentasHoy');
+        const elOrdenes = document.getElementById('kpiOrdenesHoy');
+        const elEnvios = document.getElementById('kpiEnviosPendientes');
+
+        if (elVentas) elVentas.textContent = `$${(parseFloat(data.totalVentas) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (elOrdenes) elOrdenes.textContent = data.cantOrdenes || 0;
+        if (elEnvios) elEnvios.textContent = data.enviosPendientes || 0;
+    } catch (err) {
+        console.error('Error al cargar métricas del día:', err);
+    }
+}
+
+// ==========================================
+// UTILIDADES (Debounce & Formateo)
+// ==========================================
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
 }
 
 function actualizarColorEstado(valor) {
@@ -74,7 +160,6 @@ function toggleEnvioFields() {
     }
 }
 
-// Asegurar que solo uno de los checkboxes de pago esté activo a la vez
 function seleccionarPagoEnvio(idSeleccionado) {
     const chkProd = document.getElementById('chk_prod_abonado');
     const chkTotal = document.getElementById('chk_abonado_total');
@@ -86,7 +171,6 @@ function seleccionarPagoEnvio(idSeleccionado) {
     }
 }
 
-// Formateador seguro de fechas para evitar desfase por Zona Horaria (UTC-3)
 function formatearFechaVista(fechaRaw) {
     if (!fechaRaw) return 'S/D';
     const fechaLimpia = fechaRaw.split('T')[0];
@@ -97,11 +181,13 @@ function formatearFechaVista(fechaRaw) {
     return fechaLimpia;
 }
 
-// Abrir chat directo de WhatsApp con el cliente
+// ==========================================
+// WHATSAPP CLIENTE & CADETE
+// ==========================================
 function abrirWhatsAppCliente() {
     const rawTel = document.getElementById('cliente_telefono').value;
     if (!rawTel || rawTel.trim() === '') {
-        alert('Ingresá un número de teléfono primero.');
+        showToast('Ingresá un número de teléfono primero.', 'warning');
         return;
     }
 
@@ -113,7 +199,6 @@ function abrirWhatsAppCliente() {
     window.open(`https://wa.me/${numLimpio}`, '_blank');
 }
 
-// Enviar WhatsApp con datos del pedido al cadete/mensajería
 function enviarWhatsappCadete() {
     const cliente = document.getElementById('cliente_nombre').value || 'Sin especificar';
     const direccion = document.getElementById('direccion_envio').value || 'Sin especificar';
@@ -158,6 +243,11 @@ function enviarWhatsappCadete() {
     }
 }
 
+// ==========================================
+// BÚSQUEDA DE PRODUCTOS CON DEBOUNCE Y STOCK
+// ==========================================
+const onProdSearchInput = debounce((val) => buscarProductos(val), 250);
+
 async function buscarProductos(query) {
     const resDiv = document.getElementById('prodResults');
     if (!query || query.trim().length === 0) {
@@ -169,18 +259,32 @@ async function buscarProductos(query) {
         const res = await fetch(`/api/productos/buscar?q=${encodeURIComponent(query)}&marca=${MARCA_ACTUAL}`);
         const productos = await res.json();
 
-        if (productos.length === 0) {
-            resDiv.innerHTML = '<div class="p-3 text-xs text-slate-400 italic">No se encontraron productos</div>';
+        if (!productos || productos.length === 0) {
+            resDiv.innerHTML = '<div class="p-3 text-xs text-slate-400 italic text-center">No se encontraron productos</div>';
         } else {
-            resDiv.innerHTML = productos.map(p => `
+            resDiv.innerHTML = productos.map(p => {
+                const stockNum = parseInt(p.stock) || 0;
+                let stockBadge = `<span class="text-[10px] text-slate-400">Stock: ${stockNum}</span>`;
+                if (stockNum <= 0) {
+                    stockBadge = `<span class="text-[9px] bg-rose-950/80 text-rose-300 border border-rose-800 px-1.5 py-0.5 rounded font-bold">❌ Sin stock</span>`;
+                } else if (stockNum <= 2) {
+                    stockBadge = `<span class="text-[9px] bg-amber-950/80 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded font-bold">⚠️ Poco stock: ${stockNum}</span>`;
+                }
+
+                return `
                 <div onclick="seleccionarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-2.5 hover:bg-slate-700/80 cursor-pointer border-b border-slate-700/50 flex justify-between items-center transition">
                     <div>
                         <div class="text-xs font-bold text-white">${p.nombre}</div>
-                        <div class="text-[10px] text-slate-400">Var: ${p.variante || 'N/A'} | Stock: ${p.stock}</div>
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span>Var: ${p.variante || 'N/A'}</span>
+                            <span>•</span>
+                            ${stockBadge}
+                        </div>
                     </div>
                     <div class="text-xs font-bold text-emerald-400">$${parseFloat(p.precio).toFixed(2)}</div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
         resDiv.classList.remove('hidden');
     } catch (err) {
@@ -192,6 +296,7 @@ function seleccionarProducto(p) {
     const existe = carrito.find(item => item.id === p.id);
     if (existe) {
         existe.cantidad += 1;
+        showToast(`Sumado: ${p.nombre} (x${existe.cantidad})`, 'info');
     } else {
         carrito.push({
             id: p.id,
@@ -200,6 +305,7 @@ function seleccionarProducto(p) {
             precio: parseFloat(p.precio),
             cantidad: 1
         });
+        showToast(`Agregado: ${p.nombre}`, 'success');
     }
     document.getElementById('prodSearch').value = '';
     document.getElementById('prodResults').classList.add('hidden');
@@ -223,7 +329,7 @@ function renderCarrito() {
             <div class="flex items-center gap-2">
                 <input type="number" min="1" value="${item.cantidad}" onchange="cambiarCantidad(${index}, this.value)" class="w-12 bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-center font-bold text-white">
                 <div class="font-bold text-emerald-400 w-16 text-right">$${(item.precio * item.cantidad).toFixed(2)}</div>
-                <button type="button" onclick="eliminarDelCarrito(${index})" class="text-rose-400 hover:text-rose-300 font-bold px-1.5">✕</button>
+                <button type="button" onclick="eliminarDelCarrito(${index})" class="text-rose-400 hover:text-rose-300 font-bold px-1.5" title="Quitar">✕</button>
             </div>
         </div>
     `).join('');
@@ -251,11 +357,14 @@ function calcularTotal() {
     document.getElementById('totalLabel').textContent = `$${total.toFixed(2)}`;
 }
 
+// ==========================================
+// GUARDAR Y GESTIONAR ÓRDENES
+// ==========================================
 async function guardarOrden(e) {
     e.preventDefault();
 
     if (carrito.length === 0) {
-        alert('Debes agregar al menos un producto.');
+        showToast('Debes agregar al menos un producto al pedido.', 'warning');
         return;
     }
 
@@ -301,17 +410,20 @@ async function guardarOrden(e) {
         if (data.success) {
             if (!ordenId) {
                 document.getElementById('modalNumOrden').textContent = data.numero_orden;
+                ultimaOrdenGuardada = { ...payload, numero_orden: data.numero_orden };
                 document.getElementById('modalExito').classList.remove('hidden');
+                showToast(`¡Orden ${data.numero_orden} registrada con éxito!`, 'success');
             } else {
-                alert('Orden actualizada correctamente.');
+                showToast('Orden actualizada correctamente.', 'success');
             }
             limpiarFormulario();
             cargarUltimasOrdenes();
+            cargarMetricasHoy();
         } else {
-            alert('Error: ' + data.error);
+            showToast('Error: ' + (data.error || 'No se pudo guardar la orden.'), 'error');
         }
     } catch (err) {
-        alert('Error al conectar con el servidor.');
+        showToast('Error al conectar con el servidor.', 'error');
     }
 }
 
@@ -324,12 +436,12 @@ async function buscarOrden() {
         const data = await res.json();
 
         if (res.status === 403) {
-            alert(data.error);
+            showToast(data.error, 'error');
             return;
         }
 
         if (!res.ok || !data) {
-            alert('Orden no encontrada.');
+            showToast('Orden no encontrada.', 'warning');
             return;
         }
 
@@ -363,7 +475,6 @@ async function buscarOrden() {
 
         toggleEnvioFields();
 
-        // Carga dinámica del nombre del producto actualizado del catálogo conservando el precio guardado
         carrito = (data.orden_detalles || []).map(d => ({
             id: d.producto_id,
             nombre: (d.productos && d.productos.nombre) ? d.productos.nombre : 'Producto',
@@ -373,52 +484,107 @@ async function buscarOrden() {
         }));
 
         renderCarrito();
+        showToast(`Orden ${data.numero_orden} cargada en formulario.`, 'info');
     } catch (err) {
-        alert('Error al buscar la orden.');
+        showToast('Error al buscar la orden.', 'error');
     }
 }
 
-// Cargar pedidos con la fecha formateada correctamente
+// ==========================================
+// LISTADO DE ÓRDENES Y ACCIONES RÁPIDAS
+// ==========================================
 async function cargarUltimasOrdenes() {
     const list = document.getElementById('listaUltimasOrdenes');
     const filtroSelect = document.getElementById('filtroEstadoLista');
+    const contador = document.getElementById('contadorOrdenes');
     const estadoFiltro = filtroSelect ? filtroSelect.value : 'TODOS';
 
     try {
-        const res = await fetch(`/api/ordenes/ultimas?marca=${MARCA_ACTUAL}`);
+        const res = await fetch(`/api/ordenes/ultimas?marca=${MARCA_ACTUAL}&limite=30`);
         const ordenes = await res.json();
+        ultimasOrdenesMemoria = ordenes || [];
 
         const ordenesFiltradas = estadoFiltro === 'TODOS' 
-            ? ordenes 
-            : ordenes.filter(o => o.estado === estadoFiltro);
+            ? ultimasOrdenesMemoria 
+            : ultimasOrdenesMemoria.filter(o => o.estado === estadoFiltro);
+
+        if (contador) contador.textContent = ordenesFiltradas.length;
 
         if (ordenesFiltradas.length === 0) {
-            list.innerHTML = `<p class="text-xs text-slate-500 italic p-2">Sin pedidos ${estadoFiltro !== 'TODOS' ? `en estado '${estadoFiltro}'` : ''}.</p>`;
+            list.innerHTML = `<p class="text-xs text-slate-500 italic p-3 text-center">Sin pedidos ${estadoFiltro !== 'TODOS' ? `en estado '${estadoFiltro}'` : ''}.</p>`;
             return;
         }
 
         list.innerHTML = ordenesFiltradas.map(o => {
-            let colorEstado = 'bg-amber-950 text-amber-400 border-amber-700';
-            if (o.estado === 'Abonado') colorEstado = 'bg-blue-950 text-blue-400 border-blue-700';
-            if (o.estado === 'Preparado') colorEstado = 'bg-purple-950 text-purple-400 border-purple-700';
-            if (o.estado === 'Finalizado') colorEstado = 'bg-emerald-950 text-emerald-400 border-emerald-700';
-            if (o.estado === 'Cancelado') colorEstado = 'bg-rose-950 text-rose-400 border-rose-700';
+            let colorBorder = 'border-amber-700/60 bg-amber-950/30';
+            let colorTexto = 'text-amber-400';
+            if (o.estado === 'Abonado') { colorBorder = 'border-blue-700/60 bg-blue-950/30'; colorTexto = 'text-blue-400'; }
+            if (o.estado === 'Preparado') { colorBorder = 'border-purple-700/60 bg-purple-950/30'; colorTexto = 'text-purple-400'; }
+            if (o.estado === 'Finalizado') { colorBorder = 'border-emerald-700/60 bg-emerald-950/30'; colorTexto = 'text-emerald-400'; }
+            if (o.estado === 'Cancelado') { colorBorder = 'border-rose-700/60 bg-rose-950/30'; colorTexto = 'text-rose-400'; }
 
             return `
-                <div onclick="cargarOrdenEnFormulario('${o.numero_orden}')" class="p-2.5 bg-slate-900/80 hover:bg-slate-900 rounded-xl border border-slate-700/80 cursor-pointer transition flex justify-between items-center text-xs">
-                    <div>
-                        <div class="font-black text-white">${o.numero_orden} <span class="font-normal text-slate-400 text-[10px]">- ${o.cliente_nombre || 'S/D'}</span></div>
-                        <div class="text-[10px] text-slate-400">${formatearFechaVista(o.fecha)}</div>
+                <div class="p-3 bg-slate-900/90 hover:bg-slate-900 rounded-xl border ${colorBorder} transition flex flex-col gap-2 text-xs group shadow-sm">
+                    <div class="flex justify-between items-start cursor-pointer" onclick="cargarOrdenEnFormulario('${o.numero_orden}')">
+                        <div>
+                            <div class="font-black text-white flex items-center gap-1.5">
+                                <span>${o.numero_orden}</span>
+                                <span class="font-normal text-slate-400 text-[11px] truncate max-w-[130px]">- ${o.cliente_nombre || 'S/D'}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                <span>📅 ${formatearFechaVista(o.fecha)}</span>
+                                <span>${o.modo_entrega === 'Envio' ? '🛵 Envío' : '🛍️ Retiro'}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-extrabold text-emerald-400 text-sm">$${parseFloat(o.total).toFixed(2)}</div>
+                        </div>
                     </div>
-                    <div class="text-right">
-                        <span class="text-[9px] px-2 py-0.5 rounded-full border ${colorEstado} font-bold">${o.estado}</span>
-                        <div class="font-extrabold text-emerald-400 mt-0.5">$${parseFloat(o.total).toFixed(2)}</div>
+
+                    <!-- Fila de Acciones Rápidas: Selector de Estado e Impresión Directa -->
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800">
+                        <select onchange="cambiarEstadoRapido(${o.id}, this.value)" class="bg-slate-800 border border-slate-700 text-[10px] font-bold ${colorTexto} rounded-md px-2 py-1 focus:outline-none">
+                            <option value="Iniciado" ${o.estado === 'Iniciado' ? 'selected' : ''}>🟡 Iniciado</option>
+                            <option value="Abonado" ${o.estado === 'Abonado' ? 'selected' : ''}>🔵 Abonado</option>
+                            <option value="Preparado" ${o.estado === 'Preparado' ? 'selected' : ''}>🟣 Preparado</option>
+                            <option value="Finalizado" ${o.estado === 'Finalizado' ? 'selected' : ''}>🟢 Finalizado</option>
+                            <option value="Cancelado" ${o.estado === 'Cancelado' ? 'selected' : ''}>🔴 Cancelado</option>
+                        </select>
+
+                        <div class="flex items-center gap-1">
+                            <button type="button" onclick="imprimirEtiquetaDirecta(${JSON.stringify(o).replace(/"/g, '&quot;')})" title="Imprimir Etiqueta" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-1 rounded-md text-[11px] border border-slate-700 transition">
+                                🖨️
+                            </button>
+                            <button type="button" onclick="cargarOrdenEnFormulario('${o.numero_orden}')" title="Editar Pedido" class="bg-slate-800 hover:bg-slate-700 text-sky-400 p-1 rounded-md text-[11px] border border-slate-700 transition">
+                                ✏️
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
         }).join('');
     } catch (err) {
-        list.innerHTML = '<p class="text-xs text-rose-400">Error al cargar listado.</p>';
+        list.innerHTML = '<p class="text-xs text-rose-400 p-2">Error al cargar listado de pedidos.</p>';
+    }
+}
+
+async function cambiarEstadoRapido(ordenId, nuevoEstado) {
+    try {
+        const res = await fetch(`/api/ordenes/${ordenId}/estado`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: nuevoEstado })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Estado actualizado a: ${nuevoEstado}`, 'success');
+            cargarUltimasOrdenes();
+            cargarMetricasHoy();
+        } else {
+            showToast('Error al actualizar estado: ' + (data.error || ''), 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión al actualizar estado.', 'error');
     }
 }
 
@@ -456,24 +622,46 @@ function cerrarModal() {
     document.getElementById('modalExito').classList.add('hidden');
 }
 
-// Modal Exportar Excel
+// ==========================================
+// MODAL EXPORTAR EXCEL AVANZADO
+// ==========================================
 function abrirModalExportar() { document.getElementById('modalExportar').classList.remove('hidden'); }
 function cerrarModalExportar() { document.getElementById('modalExportar').classList.add('hidden'); }
 
-function descargarCSVFiltrado() {
+function setPresetExport(tipo) {
+    const hoyStr = new Date().toISOString().split('T')[0];
+    const inputInicio = document.getElementById('exportFechaInicio');
+    const inputFin = document.getElementById('exportFechaFin');
+
+    if (tipo === 'hoy') {
+        inputInicio.value = hoyStr;
+        inputFin.value = hoyStr;
+    } else if (tipo === 'mes') {
+        const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        inputInicio.value = primerDiaMes;
+        inputFin.value = hoyStr;
+    } else if (tipo === 'todo') {
+        inputInicio.value = '';
+        inputFin.value = '';
+    }
+}
+
+function descargarInformeExcel() {
     const desde = document.getElementById('exportFechaInicio').value;
     const hasta = document.getElementById('exportFechaFin').value;
-    if (!desde || !hasta) {
-        alert('Seleccioná ambas fechas.');
-        return;
-    }
-    window.location.href = `/api/ordenes/exportar?desde=${desde}&hasta=${hasta}&marca=${MARCA_ACTUAL}`;
+    
+    showToast('Generando informe completo en Excel...', 'info');
+    window.location.href = `/api/ordenes/exportar?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}`;
     cerrarModalExportar();
 }
 
-// Modal Stock
+// ==========================================
+// MODAL STOCK Y PRECIOS
+// ==========================================
 function abrirModalStock() { document.getElementById('modalStock').classList.remove('hidden'); }
 function cerrarModalStock() { document.getElementById('modalStock').classList.add('hidden'); }
+
+const onBuscarStockInput = debounce((val) => buscarParaCambiarStock(val), 250);
 
 async function buscarParaCambiarStock(q) {
     const container = document.getElementById('resultadosCambioStock');
@@ -485,12 +673,18 @@ async function buscarParaCambiarStock(q) {
     const res = await fetch(`/api/productos/buscar?q=${encodeURIComponent(q)}&marca=${MARCA_ACTUAL}`);
     const productos = await res.json();
 
-    if (productos.length === 0) {
-        container.innerHTML = '<div class="p-2 text-xs text-slate-400">Sin resultados</div>';
+    if (!productos || productos.length === 0) {
+        container.innerHTML = '<div class="p-2 text-xs text-slate-400 text-center">Sin resultados</div>';
     } else {
         container.innerHTML = productos.map(p => `
-            <div onclick="seleccionarProdParaStock(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-2 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs text-white">
-                <b>${p.nombre}</b> - ${p.variante || 'N/A'} ($${p.precio}) [Stock: ${p.stock}]
+            <div onclick="seleccionarProdParaStock(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-2 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs text-white flex justify-between items-center">
+                <div>
+                    <b>${p.nombre}</b> - ${p.variante || 'N/A'}
+                </div>
+                <div class="text-right">
+                    <span class="text-emerald-400 font-bold">$${p.precio}</span>
+                    <span class="text-slate-400 text-[10px] block">Stock: ${p.stock}</span>
+                </div>
             </div>
         `).join('');
     }
@@ -527,7 +721,7 @@ async function guardarNuevoStockCat() {
     const stock = document.getElementById('editProdStock').value;
 
     if (!nombre || nombre.trim() === '') {
-        alert('El nombre del producto no puede estar vacío.');
+        showToast('El nombre del producto no puede estar vacío.', 'warning');
         return;
     }
 
@@ -539,15 +733,17 @@ async function guardarNuevoStockCat() {
 
     const data = await res.json();
     if (data.success) {
-        alert('Producto actualizado correctamente.');
+        showToast('Producto y stock actualizados correctamente.', 'success');
         volverAtrasStock();
         cerrarModalStock();
     } else {
-        alert('Error al actualizar el producto.');
+        showToast('Error al actualizar el producto.', 'error');
     }
 }
 
-// Modal Producto Manual
+// ==========================================
+// MODAL PRODUCTO MANUAL
+// ==========================================
 function abrirModalManual() { document.getElementById('modalManual').classList.remove('hidden'); }
 function cerrarModalManual() { document.getElementById('modalManual').classList.add('hidden'); }
 
@@ -557,7 +753,7 @@ async function guardarProductoManual() {
     const precio = document.getElementById('manualPrecio').value;
 
     if (!nombre || !precio) {
-        alert('Nombre y precio son obligatorios.');
+        showToast('Nombre y precio son obligatorios.', 'warning');
         return;
     }
 
@@ -574,12 +770,117 @@ async function guardarProductoManual() {
         document.getElementById('manualNombre').value = '';
         document.getElementById('manualVariante').value = '';
         document.getElementById('manualPrecio').value = '';
+        showToast('Producto manual creado e insertado.', 'success');
     } else {
-        alert('Error al crear producto.');
+        showToast('Error al crear producto.', 'error');
     }
 }
 
-// Imprimir Etiqueta con Estados de Pago Personalizados
+// ==========================================
+// LECTOR DE CÓDIGO DE BARRAS / CÁMARA
+// ==========================================
+function abrirModalScanner() {
+    document.getElementById('modalScanner').classList.remove('hidden');
+    iniciarEscaner();
+}
+
+function cerrarModalScanner() {
+    detenerEscaner();
+    document.getElementById('modalScanner').classList.add('hidden');
+}
+
+async function iniciarEscaner() {
+    const statusDiv = document.getElementById('scannerStatus');
+    statusDiv.textContent = 'Accediendo a la cámara...';
+
+    if (typeof Html5Qrcode === 'undefined') {
+        statusDiv.textContent = 'Librería de escaneo no disponible.';
+        return;
+    }
+
+    try {
+        if (!html5QrCodeScanner) {
+            html5QrCodeScanner = new Html5Qrcode("scannerReader");
+        }
+
+        const config = { fps: 10, qrbox: { width: 220, height: 160 } };
+        await html5QrCodeScanner.start(
+            { facingMode: "environment" },
+            config,
+            async (decodedText) => {
+                detenerEscaner();
+                cerrarModalScanner();
+                showToast(`Código detectado: ${decodedText}`, 'info');
+
+                // Buscar producto por el código escaneado
+                const res = await fetch(`/api/productos/buscar?q=${encodeURIComponent(decodedText)}&marca=${MARCA_ACTUAL}`);
+                const productos = await res.json();
+
+                if (productos && productos.length > 0) {
+                    seleccionarProducto(productos[0]);
+                } else {
+                    document.getElementById('prodSearch').value = decodedText;
+                    buscarProductos(decodedText);
+                    showToast(`No se encontró producto exacto para ${decodedText}. Buscando coincidencias...`, 'warning');
+                }
+            },
+            (errorMessage) => {
+                // Errores de frame ignorados
+            }
+        );
+        statusDiv.textContent = '📷 Apuntá al código de barras';
+    } catch (err) {
+        statusDiv.textContent = 'No se pudo activar la cámara: ' + (err.message || err);
+    }
+}
+
+function detenerEscaner() {
+    if (html5QrCodeScanner) {
+        html5QrCodeScanner.stop().catch(() => {}).finally(() => {
+            html5QrCodeScanner = null;
+        });
+    }
+}
+
+// ==========================================
+// IMPRESIÓN DE ETIQUETAS TÉRMICAS
+// ==========================================
+function imprimirEtiquetaUltima() {
+    if (ultimaOrdenGuardada) {
+        imprimirTicketPlantilla(
+            ultimaOrdenGuardada.cliente_nombre,
+            ultimaOrdenGuardada.cliente_telefono,
+            ultimaOrdenGuardada.modo_entrega,
+            ultimaOrdenGuardada.direccion_envio,
+            ultimaOrdenGuardada.horario_envio,
+            ultimaOrdenGuardada.costo_envio,
+            ultimaOrdenGuardada.total,
+            document.getElementById('chk_prod_abonado')?.checked,
+            document.getElementById('chk_abonado_total')?.checked
+        );
+    } else {
+        imprimirEtiqueta();
+    }
+}
+
+function imprimirEtiquetaDirecta(orden) {
+    if (!orden) return;
+    const chkProd = false;
+    const chkTotal = orden.estado === 'Abonado' || orden.estado === 'Finalizado';
+
+    imprimirTicketPlantilla(
+        orden.cliente_nombre,
+        orden.cliente_telefono,
+        orden.modo_entrega,
+        orden.direccion_envio,
+        orden.horario_envio,
+        orden.costo_envio || 0,
+        orden.total || 0,
+        chkProd,
+        chkTotal
+    );
+}
+
 function imprimirEtiqueta() {
     const cliente = document.getElementById('cliente_nombre').value || 'Cliente sin especificar';
     const telefono = document.getElementById('cliente_telefono').value || 'Sin teléfono';
@@ -594,6 +895,10 @@ function imprimirEtiqueta() {
     const costoEnvio = parseFloat(document.getElementById('costo_envio').value) || 0;
     const totalCompleto = subtotal + costoEnvio;
 
+    imprimirTicketPlantilla(cliente, telefono, modo, direccion, horario, costoEnvio, totalCompleto, chkProdAbonado, chkAbonadoTotal);
+}
+
+function imprimirTicketPlantilla(cliente, telefono, modo, direccion, horario, costoEnvio, totalCompleto, chkProdAbonado, chkAbonadoTotal) {
     let etiquetaTexto = "";
     let montoMostrar = totalCompleto;
     let subtituloMonto = "";
@@ -607,13 +912,12 @@ function imprimirEtiqueta() {
         montoMostrar = costoEnvio;
         subtituloMonto = "(Cobrar solo envío)";
     } else if (modo === 'Envio' && costoEnvio > 0) {
-        subtituloMonto = `(Inc. envío $${costoEnvio.toFixed(2)})`;
+        subtituloMonto = `(Inc. envío $${parseFloat(costoEnvio).toFixed(2)})`;
     }
 
     const esIncanto = MARCA_ACTUAL === 'incanto';
     const logoSrc = esIncanto ? '/logos/incanto.png' : '/logos/panatech.png';
     const colorMarca = esIncanto ? '#be123c' : '#0284c7';
-
     const igAccount = esIncanto ? 'incanto.rosario' : 'panatech.rosario';
     const direccionLocal = 'Callao 1255 11E, Rosario';
 
@@ -772,14 +1076,14 @@ function imprimirEtiqueta() {
                 
                 <div class="field">
                     <span class="label">👤 Cliente</span>
-                    <span class="value">${cliente}</span>
+                    <span class="value">${cliente || '-'}</span>
                 </div>
 
                 <div class="field">
                     <span class="label">Teléfono</span>
                     <span class="value">
                         <img src="/logos/whatsapp.png" class="icon-img" alt="WA" onerror="this.src='https://cdn-icons-png.flaticon.com/512/733/733585.png'">
-                        ${telefono}
+                        ${telefono || '-'}
                     </span>
                 </div>
 
@@ -802,13 +1106,12 @@ function imprimirEtiqueta() {
                     </div>
                 ` : ''}
 
-                <!-- Muestra del Total a Cobrar -->
                 <div class="total-box">
                     <div>
                         <div class="total-title">Total a Cobrar</div>
                         ${subtituloMonto ? `<div style="font-size: 9px; color: #64748b;">${subtituloMonto}</div>` : ''}
                     </div>
-                    <div class="total-monto">$${montoMostrar.toFixed(2)}</div>
+                    <div class="total-monto">$${parseFloat(montoMostrar || 0).toFixed(2)}</div>
                 </div>
                 
                 <div class="footer">

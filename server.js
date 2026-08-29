@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
-const ExcelJS = require('exceljs');
+const { generarReporteVentasAvanzado } = require('./excelService');
 
 const app = express();
 app.use(express.json());
@@ -126,29 +126,69 @@ app.post('/login/:marca', (req, res) => {
     }
 });
 
-// API Buscar Productos
+// API Métricas de Hoy (Mini-Dashboard)
+app.get('/api/metricas/hoy', async (req, res) => {
+    const { marca } = req.query;
+    const marcaTarget = (marca || 'panatech').toLowerCase();
+    const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
+
+    // Fecha actual en hora local / ISO string YYYY-MM-DD
+    const hoyStr = new Date().toISOString().split('T')[0];
+
+    try {
+        const { data: ordenesHoy, error } = await supabase
+            .from('ordenes')
+            .select('id, total, estado, modo_entrega, costo_envio, fecha')
+            .ilike('numero_orden', `${prefijo}%`)
+            .gte('fecha', hoyStr);
+
+        if (error) throw error;
+
+        const totalVentas = (ordenesHoy || [])
+            .filter(o => o.estado !== 'Cancelado')
+            .reduce((acc, o) => acc + (parseFloat(o.total) || 0), 0);
+
+        const cantOrdenes = (ordenesHoy || []).length;
+
+        // Envíos pendientes (no finalizados ni cancelados)
+        const { count: enviosPendientes } = await supabase
+            .from('ordenes')
+            .select('*', { count: 'exact', head: true })
+            .ilike('numero_orden', `${prefijo}%`)
+            .eq('modo_entrega', 'Envio')
+            .neq('estado', 'Finalizado')
+            .neq('estado', 'Cancelado');
+
+        res.json({
+            totalVentas,
+            cantOrdenes,
+            enviosPendientes: enviosPendientes || 0
+        });
+    } catch (err) {
+        res.json({ totalVentas: 0, cantOrdenes: 0, enviosPendientes: 0 });
+    }
+});
+
+// API Buscar Productos (Optimizada con filtro DB y stock)
 app.get('/api/productos/buscar', async (req, res) => {
     const { q, marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
 
     try {
-        let { data, error } = await supabase
+        let query = supabase
             .from('productos')
             .select('*')
             .eq('marca', marcaTarget);
 
-        if (error) throw error;
-
         if (q && q.trim().length > 0) {
-            const termino = q.trim().toLowerCase();
-            data = data.filter(p => 
-                (p.nombre && p.nombre.toLowerCase().includes(termino)) ||
-                (p.codigo_sku && p.codigo_sku.toLowerCase().includes(termino)) ||
-                (p.variante && p.variante.toLowerCase().includes(termino))
-            );
+            const termino = q.trim();
+            query = query.or(`nombre.ilike.%${termino}%,codigo_sku.ilike.%${termino}%,variante.ilike.%${termino}%`);
         }
 
-        res.json((data || []).slice(0, 15));
+        const { data, error } = await query.order('nombre', { ascending: true }).limit(20);
+
+        if (error) throw error;
+        res.json(data || []);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -198,19 +238,20 @@ app.post('/api/productos/manual', async (req, res) => {
     }
 });
 
-// API Últimas Órdenes
+// API Últimas Órdenes (Incluye orden_detalles y productos para acciones rápidas)
 app.get('/api/ordenes/ultimas', async (req, res) => {
-    const { marca } = req.query;
+    const { marca, limite } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
     const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
+    const limitNum = parseInt(limite) || 20;
 
     try {
         const { data, error } = await supabase
             .from('ordenes')
-            .select('*')
+            .select(`*, orden_detalles(*, productos(*))`)
             .ilike('numero_orden', `${prefijo}%`)
             .order('id', { ascending: false })
-            .limit(5);
+            .limit(limitNum);
 
         if (error) throw error;
         res.json(data || []);
@@ -244,18 +285,20 @@ app.post('/api/ordenes', async (req, res) => {
 
         if (errOrden) throw errOrden;
 
-        for (const item of productos) {
-            await supabase.from('orden_detalles').insert([{
-                orden_id: orden.id,
-                producto_id: item.id,
-                cantidad: item.cantidad,
-                precio_unitario: item.precio
-            }]);
+        if (productos && Array.isArray(productos)) {
+            for (const item of productos) {
+                await supabase.from('orden_detalles').insert([{
+                    orden_id: orden.id,
+                    producto_id: item.id,
+                    cantidad: item.cantidad,
+                    precio_unitario: item.precio
+                }]);
 
-            if (estado === 'Finalizado') {
-                const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.id).single();
-                if (prod) {
-                    await supabase.from('productos').update({ stock: Math.max(0, prod.stock - item.cantidad) }).eq('id', item.id);
+                if (estado === 'Finalizado') {
+                    const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.id).single();
+                    if (prod) {
+                        await supabase.from('productos').update({ stock: Math.max(0, prod.stock - item.cantidad) }).eq('id', item.id);
+                    }
                 }
             }
         }
@@ -289,7 +332,42 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
     res.json(orden);
 });
 
-// API Actualizar Orden
+// API Actualización Rápida de Estado (Iniciado -> Abonado -> Preparado -> Finalizado -> Cancelado)
+app.patch('/api/ordenes/:id/estado', async (req, res) => {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    try {
+        const { data: ordenAnterior } = await supabase.from('ordenes').select('estado').eq('id', id).single();
+        const estabaFinalizado = ordenAnterior ? ordenAnterior.estado === 'Finalizado' : false;
+
+        const { error: errUpdate } = await supabase
+            .from('ordenes')
+            .update({ estado })
+            .eq('id', id);
+
+        if (errUpdate) throw errUpdate;
+
+        // Descontar stock si pasa a Finalizado y antes no lo estaba
+        if (estado === 'Finalizado' && !estabaFinalizado) {
+            const { data: detalles } = await supabase.from('orden_detalles').select('producto_id, cantidad').eq('orden_id', id);
+            if (detalles && Array.isArray(detalles)) {
+                for (const item of detalles) {
+                    const { data: prod } = await supabase.from('productos').select('stock').eq('id', item.producto_id).single();
+                    if (prod) {
+                        await supabase.from('productos').update({ stock: Math.max(0, prod.stock - item.cantidad) }).eq('id', item.producto_id);
+                    }
+                }
+            }
+        }
+
+        res.json({ success: true, mensaje: `Estado actualizado a ${estado}` });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// API Actualizar Orden Completa
 app.put('/api/ordenes/:id', async (req, res) => {
     const { id } = req.params;
     const { fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago, productos } = req.body;
@@ -331,7 +409,7 @@ app.put('/api/ordenes/:id', async (req, res) => {
     }
 });
 
-// API Exportar EXCEL
+// API Exportar EXCEL Avanzado con Dashboard, KPIs, Rankings y Análisis Profundo
 app.get('/api/ordenes/exportar', async (req, res) => {
     const { desde, hasta, marca } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -340,7 +418,7 @@ app.get('/api/ordenes/exportar', async (req, res) => {
     try {
         let query = supabase
             .from('ordenes')
-            .select('*')
+            .select(`*, orden_detalles(*, productos(*))`)
             .ilike('numero_orden', `${prefijo}%`);
 
         if (desde) query = query.gte('fecha', desde);
@@ -350,46 +428,10 @@ app.get('/api/ordenes/exportar', async (req, res) => {
 
         if (error) return res.status(500).json({ error: error.message });
 
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Ventas');
-
-        worksheet.columns = [
-            { header: 'N° Orden', key: 'numero_orden', width: 15 },
-            { header: 'Fecha', key: 'fecha', width: 12 },
-            { header: 'Vendedor', key: 'vendedor', width: 15 },
-            { header: 'Cliente', key: 'cliente_nombre', width: 22 },
-            { header: 'Teléfono', key: 'cliente_telefono', width: 15 },
-            { header: 'Observaciones', key: 'observaciones', width: 25 },
-            { header: 'Método de Pago', key: 'metodo_pago', width: 18 },
-            { header: 'Modo Entrega', key: 'modo_entrega', width: 15 },
-            { header: 'Estado', key: 'estado', width: 15 },
-            { header: 'Total ($)', key: 'total', width: 15 }
-        ];
-
-        worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
-        worksheet.getRow(1).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: marcaTarget === 'incanto' ? 'BE123C' : '0284C7' }
-        };
-
-        ordenes.forEach(o => {
-            worksheet.addRow({
-                numero_orden: o.numero_orden,
-                fecha: new Date(o.fecha).toLocaleDateString('es-AR'),
-                vendedor: o.vendedor || '',
-                cliente_nombre: o.cliente_nombre || '',
-                cliente_telefono: o.cliente_telefono || '',
-                observaciones: o.observaciones || '',
-                metodo_pago: o.metodo_pago || 'Sin especificar',
-                modo_entrega: o.modo_entrega || '',
-                estado: o.estado || 'Iniciado',
-                total: parseFloat(o.total) || 0
-            });
-        });
+        const workbook = await generarReporteVentasAvanzado(ordenes || [], marcaTarget, desde, hasta);
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename=ventas_${marcaTarget}_${desde}_al_${hasta}.xlsx`);
+        res.setHeader('Content-Disposition', `attachment; filename=informe_ventas_${marcaTarget}_${desde || 'inicio'}_al_${hasta || 'hoy'}.xlsx`);
 
         await workbook.xlsx.write(res);
         res.end();
@@ -399,4 +441,9 @@ app.get('/api/ordenes/exportar', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
+
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
+}
+
+module.exports = app;

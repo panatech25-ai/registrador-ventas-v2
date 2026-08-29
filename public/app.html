@@ -15,48 +15,94 @@
 
     <title>Registrador de Ventas</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Librería para escaneo con cámara (Código de Barras / QR) -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        /* Animaciones para Toasts */
+        @keyframes toastIn {
+            from { transform: translateY(100%) scale(0.9); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes toastOut {
+            from { transform: translateY(0) scale(1); opacity: 1; }
+            to { transform: translateY(100%) scale(0.9); opacity: 0; }
+        }
+        .toast-animate-in { animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .toast-animate-out { animation: toastOut 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col justify-between">
 
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3"></div>
+
     <!-- Header App -->
-    <header class="bg-slate-800/90 border-b border-slate-700/80 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+    <header class="bg-slate-800/95 border-b border-slate-700/80 backdrop-blur sticky top-0 z-40 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
             <div class="flex items-center gap-2 sm:gap-3">
-                <img id="brandLogo" src="/logos/panatech.png" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-full bg-slate-900 p-1 border border-slate-700" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
+                <img id="brandLogo" src="/logos/panatech.png" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-full bg-slate-900 p-1 border border-slate-700 shadow" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
                 <div>
-                    <h1 id="brandTitle" class="text-lg sm:text-2xl font-black tracking-wider text-sky-400">PANATECH</h1>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 tracking-wider uppercase font-semibold">Registrador de Ventas</p>
+                    <h1 id="brandTitle" class="text-base sm:text-2xl font-black tracking-wider text-sky-400 leading-none">PANATECH</h1>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 tracking-wider uppercase font-semibold mt-0.5">Registrador de Ventas</p>
                 </div>
             </div>
 
             <!-- Botones Superiores -->
             <div class="flex items-center gap-1.5 sm:gap-2">
-                <button type="button" onclick="abrirModalStock()" class="bg-slate-700 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1">
+                <button type="button" onclick="abrirModalStock()" class="bg-slate-700/90 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1">
                     🏷️ <span class="hidden sm:inline">Stock / Precios</span><span class="sm:hidden">Stock</span>
                 </button>
-                <button type="button" onclick="abrirModalExportar()" class="bg-slate-700 hover:bg-slate-600 text-emerald-400 border border-emerald-500/30 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1">
-                    📊 <span class="hidden sm:inline">Exportar</span><span class="sm:hidden">Excel</span>
+                <button type="button" onclick="abrirModalExportar()" class="bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 border border-emerald-500/40 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1.5">
+                    📊 <span class="hidden sm:inline">Informe Excel</span><span class="sm:hidden">Informe</span>
                 </button>
-                <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-600/50 p-1.5 sm:p-2 rounded-lg text-xs font-semibold transition" title="Cambiar de marca">
+                <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-600/50 p-1.5 sm:p-2 rounded-lg text-xs font-semibold transition" title="Cambiar de marca / Salir">
                     🚪
                 </a>
             </div>
         </div>
     </header>
 
+    <!-- Mini Dashboard de Métricas Rápidas del Día -->
+    <section class="max-w-7xl mx-auto px-4 pt-4 pb-1 w-full">
+        <div class="grid grid-cols-3 gap-2 sm:gap-4 bg-slate-800/80 border border-slate-700/70 p-3 rounded-2xl shadow-lg">
+            <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+                <div class="text-lg sm:text-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-1.5 sm:p-2 rounded-lg">💰</div>
+                <div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Ventas de Hoy</div>
+                    <div id="kpiVentasHoy" class="text-xs sm:text-lg font-black text-emerald-400">$0.00</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+                <div class="text-lg sm:text-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 p-1.5 sm:p-2 rounded-lg">📋</div>
+                <div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Pedidos Hoy</div>
+                    <div id="kpiOrdenesHoy" class="text-xs sm:text-lg font-black text-sky-400">0</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+                <div class="text-lg sm:text-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 p-1.5 sm:p-2 rounded-lg">🛵</div>
+                <div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Envíos Pendientes</div>
+                    <div id="kpiEnviosPendientes" class="text-xs sm:text-lg font-black text-amber-400">0</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Contenido Principal -->
-    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow">
+    <main class="max-w-7xl mx-auto px-4 py-4 w-full flex-grow">
         <div class="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-6">
 
             <!-- Columna Izquierda: Formulario (8 Cols) -->
-            <div class="lg:col-span-8 bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-6">
+            <div class="lg:col-span-8 bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5">
                 
                 <!-- Buscador de Orden -->
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
                     <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Gestión de Orden</span>
                     <div class="flex items-center gap-2 w-full sm:w-auto">
                         <input type="text" id="buscarOrdenInput" placeholder="#PAN-1001" class="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 w-full sm:w-48 focus:outline-none focus:border-slate-400">
-                        <button type="button" id="buscarBtn" onclick="buscarOrden()" class="bg-sky-600 hover:bg-sky-500 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition">
+                        <button type="button" id="buscarBtn" onclick="buscarOrden()" class="bg-sky-600 hover:bg-sky-500 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition shadow">
                             Buscar
                         </button>
                     </div>
@@ -171,16 +217,21 @@
                         </div>
                     </div>
 
-                    <!-- Selección de Productos -->
+                    <!-- Selección de Productos con Botón de Escáner -->
                     <div class="space-y-2 pt-2">
                         <div class="flex justify-between items-center">
                             <label id="agregarProdLabel" class="block text-xs font-semibold text-sky-400 uppercase tracking-wider">Agregar Productos</label>
-                            <button type="button" onclick="abrirModalManual()" class="text-[11px] text-amber-400 hover:underline font-bold">+ Producto Personalizado</button>
+                            <div class="flex items-center gap-3">
+                                <button type="button" onclick="abrirModalScanner()" class="text-[11px] text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1">
+                                    📷 <span class="hidden sm:inline">Escanear Código</span>
+                                </button>
+                                <button type="button" onclick="abrirModalManual()" class="text-[11px] text-amber-400 hover:underline font-bold">+ Personalizado</button>
+                            </div>
                         </div>
                         
                         <div class="relative">
-                            <input type="text" id="prodSearch" onkeyup="buscarProductos(this.value)" placeholder="Buscar por nombre o variante..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-slate-500">
-                            <div id="prodResults" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto"></div>
+                            <input type="text" id="prodSearch" onkeyup="onProdSearchInput(this.value)" placeholder="Buscar por nombre, SKU o variante..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-slate-500">
+                            <div id="prodResults" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-60 overflow-y-auto"></div>
                         </div>
 
                         <!-- Lista Carrito -->
@@ -211,11 +262,14 @@
                 </form>
             </div>
 
-            <!-- Columna de Últimas Órdenes con Filtro por Estado -->
+            <!-- Columna de Últimas Órdenes con Acciones Rápidas -->
             <div class="lg:col-span-4 space-y-4">
                 <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-2xl shadow-xl">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                        <h2 id="panelUltimosTitle" class="text-xs font-bold tracking-wider text-sky-400 uppercase">Pedidos</h2>
+                        <div class="flex items-center gap-2">
+                            <h2 id="panelUltimosTitle" class="text-xs font-bold tracking-wider text-sky-400 uppercase">Pedidos Recientes</h2>
+                            <span id="contadorOrdenes" class="text-[10px] bg-slate-900 px-2 py-0.5 rounded-full border border-slate-700 text-slate-400 font-semibold">0</span>
+                        </div>
                         <div class="flex items-center gap-1">
                             <select id="filtroEstadoLista" onchange="cargarUltimasOrdenes()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
                                 <option value="TODOS">📋 Todos</option>
@@ -228,7 +282,7 @@
                             <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white p-1" title="Actualizar">🔄</button>
                         </div>
                     </div>
-                    <div id="listaUltimasOrdenes" class="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                    <div id="listaUltimasOrdenes" class="space-y-2 max-h-[620px] overflow-y-auto pr-1">
                         <p class="text-xs text-slate-500 italic">Cargando...</p>
                     </div>
                 </div>
@@ -237,38 +291,66 @@
         </div>
     </main>
 
-    <!-- Modal Exportar Excel -->
-    <div id="modalExportar" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-sm w-full space-y-4">
-            <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider">Exportar Ventas a Excel</h3>
-            <p class="text-xs text-slate-300">Seleccioná el rango de fechas para descargar el archivo .xlsx:</p>
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-[10px] text-slate-400 mb-1">Desde</label>
-                    <input type="date" id="exportFechaInicio" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white">
-                </div>
-                <div>
-                    <label class="block text-[10px] text-slate-400 mb-1">Hasta</label>
-                    <input type="date" id="exportFechaFin" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white">
+    <!-- Modal Exportar Excel Avanzado con Dashboard y Análisis -->
+    <div id="modalExportar" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    📊 Exportar Informe Completo de Ventas
+                </h3>
+                <button onclick="cerrarModalExportar()" class="text-slate-400 hover:text-white text-sm font-bold">✕</button>
+            </div>
+            
+            <div class="bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl text-[11px] text-emerald-200 space-y-1">
+                <div class="font-bold">✨ Incluye en el archivo .xlsx:</div>
+                <ul class="list-disc list-inside space-y-0.5 text-[10px] text-emerald-300/90">
+                    <li><b>Dashboard Ejecutivo:</b> Facturación, KPIs y ticket promedio.</li>
+                    <li><b>Ranking Top 10:</b> Productos más vendidos y gráficos de barras.</li>
+                    <li><b>Análisis profundo:</b> Por vendedor, método de pago y logística.</li>
+                    <li><b>Detalle de Órdenes y Productos:</b> Hoja por hoja organizada.</li>
+                </ul>
+            </div>
+
+            <!-- Accesos rápidos de fechas -->
+            <div class="space-y-1.5">
+                <label class="block text-[10px] text-slate-400 font-bold uppercase">Accesos Rápidos</label>
+                <div class="grid grid-cols-3 gap-1.5">
+                    <button type="button" onclick="setPresetExport('hoy')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Hoy</button>
+                    <button type="button" onclick="setPresetExport('mes')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Este Mes</button>
+                    <button type="button" onclick="setPresetExport('todo')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Historial Completo</button>
                 </div>
             </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="cerrarModalExportar()" class="bg-slate-700 text-xs px-3 py-2 rounded-lg font-bold">Cancelar</button>
-                <button onclick="descargarCSVFiltrado()" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-4 py-2 rounded-lg font-bold text-white">Descargar Excel</button>
+
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-bold">Desde</label>
+                    <input type="date" id="exportFechaInicio" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-bold">Hasta</label>
+                    <input type="date" id="exportFechaFin" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-700/80">
+                <button onclick="cerrarModalExportar()" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-2 rounded-lg font-bold">Cancelar</button>
+                <button onclick="descargarInformeExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-4 py-2 rounded-lg font-bold text-white shadow-lg transition flex items-center gap-1">
+                    ⬇️ Descargar Informe Excel
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Modal Stock y Precios -->
-    <div id="modalStock" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-        <div class="bg-slate-800 border border-slate-700 p-4 sm:p-6 rounded-2xl max-w-md w-full space-y-4">
+    <div id="modalStock" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-slate-800 border border-slate-700 p-4 sm:p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b border-slate-700 pb-2">
                 <h3 class="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider">Actualizar Producto, Precio y Stock</h3>
                 <button onclick="cerrarModalStock()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
             </div>
 
             <div class="relative">
-                <input type="text" id="buscarStockInput" onkeyup="buscarParaCambiarStock(this.value)" placeholder="Buscar producto en catálogo..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none">
+                <input type="text" id="buscarStockInput" onkeyup="onBuscarStockInput(this.value)" placeholder="Buscar producto en catálogo..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none">
                 <div id="resultadosCambioStock" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-48 overflow-y-auto"></div>
             </div>
 
@@ -306,30 +388,56 @@
         </div>
     </div>
 
+    <!-- Modal Escáner con Cámara (Código de Barras / QR) -->
+    <div id="modalScanner" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl max-w-sm w-full space-y-3 shadow-2xl text-center">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <h3 class="text-xs font-bold text-sky-400 uppercase tracking-wider">📷 Escanear Código de Barras</h3>
+                <button onclick="cerrarModalScanner()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
+            </div>
+            <p class="text-[11px] text-slate-300">Apuntá la cámara al código de barras del producto:</p>
+            
+            <div id="scannerReader" class="overflow-hidden rounded-xl bg-slate-900 border border-slate-700 w-full min-h-[240px]"></div>
+            
+            <div id="scannerStatus" class="text-xs font-semibold text-slate-400 pt-1">Iniciando cámara...</div>
+
+            <button onclick="cerrarModalScanner()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 rounded-lg text-xs">
+                Cerrar Escáner
+            </button>
+        </div>
+    </div>
+
     <!-- Modal Producto Manual -->
-    <div id="modalManual" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-sm w-full space-y-4">
+    <div id="modalManual" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl">
             <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider">Nuevo Producto Manual</h3>
             <div class="space-y-3">
-                <input type="text" id="manualNombre" placeholder="Nombre del producto" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white">
-                <input type="text" id="manualVariante" placeholder="Variante (Opcional)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white">
-                <input type="number" id="manualPrecio" placeholder="Precio ($)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white">
+                <input type="text" id="manualNombre" placeholder="Nombre del producto" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
+                <input type="text" id="manualVariante" placeholder="Variante (Opcional)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
+                <input type="number" step="0.01" id="manualPrecio" placeholder="Precio ($)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
             </div>
             <div class="flex justify-end gap-2">
                 <button onclick="cerrarModalManual()" class="bg-slate-700 text-xs px-3 py-2 rounded-lg font-bold">Cancelar</button>
-                <button onclick="guardarProductoManual()" class="bg-amber-600 hover:bg-amber-500 text-xs px-4 py-2 rounded-lg font-bold text-white">Guardar e Insertar</button>
+                <button onclick="guardarProductoManual()" class="bg-amber-600 hover:bg-amber-500 text-xs px-4 py-2 rounded-lg font-bold text-white shadow transition">Guardar e Insertar</button>
             </div>
         </div>
     </div>
 
     <!-- Modal Orden Creada -->
-    <div id="modalExito" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="modalExito" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-emerald-500/50 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
             <div class="text-4xl">🎉</div>
             <h3 class="text-base font-bold text-emerald-400">¡Orden Guardada!</h3>
             <p class="text-xs text-slate-300">Número de Pedido generado:</p>
             <div id="modalNumOrden" class="text-2xl font-black text-white bg-slate-900 p-3 rounded-xl border border-slate-700"></div>
-            <button onclick="cerrarModal()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-xs">Aceptar</button>
+            <div class="flex gap-2">
+                <button onclick="imprimirEtiquetaUltima()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                    🖨️ Imprimir Ticket
+                </button>
+                <button onclick="cerrarModal()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-xs">
+                    Aceptar
+                </button>
+            </div>
         </div>
     </div>
 
