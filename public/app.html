@@ -80,10 +80,10 @@
                     <div id="kpiOrdenesHoy" class="text-xs sm:text-lg font-black text-sky-400">0</div>
                 </div>
             </div>
-            <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-                <div class="text-lg sm:text-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 p-1.5 sm:p-2 rounded-lg">🛵</div>
+            <div onclick="filtrarEnviosPendientes()" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900 hover:border-amber-500/50 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver lista de envíos pendientes">
+                <div class="text-lg sm:text-2xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 p-1.5 sm:p-2 rounded-lg transition">🛵</div>
                 <div>
-                    <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Envíos Pendientes</div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-400 group-hover:text-amber-300 font-bold uppercase tracking-wider transition">Envíos Pendientes</div>
                     <div id="kpiEnviosPendientes" class="text-xs sm:text-lg font-black text-amber-400">0</div>
                 </div>
             </div>
@@ -92,7 +92,7 @@
 
     <!-- Contenido Principal -->
     <main class="max-w-7xl mx-auto px-4 py-4 w-full flex-grow">
-        <div class="flex flex-col lg:grid lg:grid-cols-12 gap-6">
+        <div class="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-6">
 
             <!-- Columna Izquierda: Formulario (8 Cols) -->
             <div class="lg:col-span-8 bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5">
@@ -281,6 +281,7 @@
                             <div class="hidden lg:flex items-center gap-1" onclick="event.stopPropagation()">
                                 <select id="filtroEstadoLista" onchange="cargarUltimasOrdenes()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
                                     <option value="TODOS">📋 Todos</option>
+                                    <option value="ENVIOS_PENDIENTES">🛵 Envíos Pendientes</option>
                                     <option value="Iniciado">🟡 Iniciado</option>
                                     <option value="Abonado">🔵 Abonado</option>
                                     <option value="Preparado">🟣 Preparado</option>
@@ -300,6 +301,7 @@
                             <div class="flex items-center gap-1">
                                 <select id="filtroEstadoListaMovil" onchange="sincronizarFiltroMovil(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
                                     <option value="TODOS">📋 Todos</option>
+                                    <option value="ENVIOS_PENDIENTES">🛵 Envíos Pendientes</option>
                                     <option value="Iniciado">🟡 Iniciado</option>
                                     <option value="Abonado">🔵 Abonado</option>
                                     <option value="Preparado">🟣 Preparado</option>

@@ -516,6 +516,27 @@ function sincronizarFiltroMovil(val) {
     cargarUltimasOrdenes();
 }
 
+function filtrarEnviosPendientes() {
+    const filtroDesk = document.getElementById('filtroEstadoLista');
+    const filtroMovil = document.getElementById('filtroEstadoListaMovil');
+    if (filtroDesk) filtroDesk.value = 'ENVIOS_PENDIENTES';
+    if (filtroMovil) filtroMovil.value = 'ENVIOS_PENDIENTES';
+
+    // En móvil, desplegar la lista si está oculta
+    if (window.innerWidth < 1024) {
+        const container = document.getElementById('contenedorListaPedidosMovil');
+        const icono = document.getElementById('iconoDesplegableMovil');
+        if (container && container.classList.contains('hidden')) {
+            container.classList.remove('hidden');
+            if (icono) icono.innerHTML = '📋 Ocultar ▲';
+        }
+        container?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    showToast('Filtrando envíos a domicilio pendientes...', 'info');
+    cargarUltimasOrdenes();
+}
+
 async function cargarUltimasOrdenes() {
     const list = document.getElementById('listaUltimasOrdenes');
     const filtroSelectDesk = document.getElementById('filtroEstadoLista');
@@ -537,14 +558,22 @@ async function cargarUltimasOrdenes() {
         const ordenes = await res.json();
         ultimasOrdenesMemoria = ordenes || [];
 
-        const ordenesFiltradas = estadoFiltro === 'TODOS' 
-            ? ultimasOrdenesMemoria 
-            : ultimasOrdenesMemoria.filter(o => o.estado === estadoFiltro);
+        let ordenesFiltradas = ultimasOrdenesMemoria;
+        if (estadoFiltro === 'ENVIOS_PENDIENTES') {
+            ordenesFiltradas = ultimasOrdenesMemoria.filter(o => 
+                o.modo_entrega === 'Envio' && o.estado !== 'Finalizado' && o.estado !== 'Cancelado'
+            );
+        } else if (estadoFiltro !== 'TODOS') {
+            ordenesFiltradas = ultimasOrdenesMemoria.filter(o => o.estado === estadoFiltro);
+        }
 
         if (contador) contador.textContent = ordenesFiltradas.length;
 
         if (ordenesFiltradas.length === 0) {
-            list.innerHTML = `<p class="text-xs text-slate-500 italic p-3 text-center">Sin pedidos ${estadoFiltro !== 'TODOS' ? `en estado '${estadoFiltro}'` : ''}.</p>`;
+            const labelVacio = estadoFiltro === 'ENVIOS_PENDIENTES' 
+                ? 'de envíos pendientes de entrega' 
+                : (estadoFiltro !== 'TODOS' ? `en estado '${estadoFiltro}'` : '');
+            list.innerHTML = `<p class="text-xs text-slate-500 italic p-3 text-center">Sin pedidos ${labelVacio}.</p>`;
             return;
         }
 
