@@ -212,6 +212,11 @@ app.put('/api/productos/:id/stock', async (req, res) => {
 
         if (error) throw error;
         res.json({ success: true, mensaje: 'Producto actualizado correctamente.' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // API Eliminar Producto del Catálogo
 app.delete('/api/productos/:id', async (req, res) => {
     const { id } = req.params;
