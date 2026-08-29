@@ -650,9 +650,37 @@ async function cambiarEstadoRapido(ordenId, nuevoEstado) {
     }
 }
 
+function nuevaOrden() {
+    limpiarFormulario();
+    const buscarInput = document.getElementById('buscarOrdenInput');
+    if (buscarInput) buscarInput.value = '';
+    
+    // Scroll hacia el formulario
+    const formElement = document.getElementById('ordenForm');
+    if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    showToast('Nuevo pedido listo para registrar.', 'info');
+}
+
 function cargarOrdenEnFormulario(num) {
     document.getElementById('buscarOrdenInput').value = num;
     buscarOrden();
+
+    // En versión celular (menor a 1024px), ocultar la lista de pedidos recientes
+    if (window.innerWidth < 1024) {
+        const container = document.getElementById('contenedorListaPedidosMovil');
+        const icono = document.getElementById('iconoDesplegableMovil');
+        if (container && !container.classList.contains('hidden')) {
+            container.classList.add('hidden');
+            if (icono) icono.innerHTML = '📋 Ver Pedidos ▼';
+        }
+        // Scroll suave al formulario para ver el pedido cargado
+        const formContainer = document.getElementById('ordenForm');
+        if (formContainer) {
+            formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
 }
 
 function limpiarFormulario() {
@@ -766,6 +794,9 @@ function seleccionarProdParaStock(p) {
     const btn = document.getElementById('btnGuardarStock');
     btn.disabled = false;
     btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+    const btnEliminar = document.getElementById('btnEliminarProdStock');
+    if (btnEliminar) btnEliminar.classList.remove('hidden');
 }
 
 function volverAtrasStock() {
@@ -774,6 +805,9 @@ function volverAtrasStock() {
     const btn = document.getElementById('btnGuardarStock');
     btn.disabled = true;
     btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+    const btnEliminar = document.getElementById('btnEliminarProdStock');
+    if (btnEliminar) btnEliminar.classList.add('hidden');
 }
 
 async function guardarNuevoStockCat() {
@@ -800,6 +834,33 @@ async function guardarNuevoStockCat() {
         cerrarModalStock();
     } else {
         showToast('Error al actualizar el producto.', 'error');
+    }
+}
+
+async function eliminarProductoStock() {
+    const id = document.getElementById('editStockProdId').value;
+    const nombre = document.getElementById('editProdNombre').value;
+
+    if (!id) return;
+
+    if (!confirm(`¿Estás seguro de que deseas eliminar el producto "${nombre}" del catálogo?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/productos/${id}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.mensaje || 'Producto eliminado.', data.esReferenciado ? 'warning' : 'success');
+            volverAtrasStock();
+            cerrarModalStock();
+        } else {
+            showToast('Error al eliminar: ' + (data.error || ''), 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión al eliminar producto.', 'error');
     }
 }
 

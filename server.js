@@ -212,6 +212,40 @@ app.put('/api/productos/:id/stock', async (req, res) => {
 
         if (error) throw error;
         res.json({ success: true, mensaje: 'Producto actualizado correctamente.' });
+// API Eliminar Producto del Catálogo
+app.delete('/api/productos/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Verificar si está referenciado en órdenes históricas
+        const { data: details, error: checkErr } = await supabase
+            .from('orden_detalles')
+            .select('id')
+            .eq('producto_id', id)
+            .limit(1);
+
+        if (checkErr) throw checkErr;
+
+        if (details && details.length > 0) {
+            // Producto en órdenes históricas: dejar en stock 0 para no romper ventas pasadas
+            await supabase
+                .from('productos')
+                .update({ stock: 0 })
+                .eq('id', id);
+
+            return res.json({ 
+                success: true, 
+                esReferenciado: true,
+                mensaje: 'El producto está asociado a ventas históricas; se ha puesto su stock en 0.' 
+            });
+        }
+
+        const { error } = await supabase
+            .from('productos')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        res.json({ success: true, esReferenciado: false, mensaje: 'Producto eliminado del catálogo correctamente.' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
