@@ -745,6 +745,26 @@ function descargarInformeExcel() {
     cerrarModalExportar();
 }
 
+function descargarInformePDF() {
+    const desde = document.getElementById('exportFechaInicio').value;
+    const hasta = document.getElementById('exportFechaFin').value;
+
+    showToast('Generando presentación ejecutiva en PDF...', 'info');
+    const url = `/reporte-presentacion?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}&autoPdf=1`;
+    window.open(url, '_blank');
+    cerrarModalExportar();
+}
+
+function abrirPresentacionEnPantalla() {
+    const desde = document.getElementById('exportFechaInicio').value;
+    const hasta = document.getElementById('exportFechaFin').value;
+
+    showToast('Abriendo informe en modo presentación...', 'info');
+    const url = `/reporte-presentacion?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}`;
+    window.open(url, '_blank');
+    cerrarModalExportar();
+}
+
 // ==========================================
 // MODAL STOCK Y PRECIOS
 // ==========================================

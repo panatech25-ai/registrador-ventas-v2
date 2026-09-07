@@ -3,6 +3,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const { generarReporteVentasAvanzado } = require('./excelService');
+const { generarHTMLPresentacion } = require('./reportePresentacionService');
 
 const app = express();
 app.use(express.json());
@@ -445,6 +446,33 @@ app.put('/api/ordenes/:id', async (req, res) => {
         res.json({ success: true, mensaje: 'Orden y productos actualizados correctamente.' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Ruta Presentación Ejecutiva y Generador de PDF
+app.get('/reporte-presentacion', async (req, res) => {
+    const { desde, hasta, marca } = req.query;
+    const marcaTarget = (marca || 'panatech').toLowerCase();
+    const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
+
+    try {
+        let query = supabase
+            .from('ordenes')
+            .select(`*, orden_detalles(*, productos(*))`)
+            .ilike('numero_orden', `${prefijo}%`);
+
+        if (desde) query = query.gte('fecha', desde);
+        if (hasta) query = query.lte('fecha', hasta);
+
+        const { data: ordenes, error } = await query.order('id', { ascending: true });
+
+        if (error) return res.status(500).send(`Error al consultar datos: ${error.message}`);
+
+        const html = generarHTMLPresentacion(ordenes || [], marcaTarget, desde, hasta);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(html);
+    } catch (err) {
+        res.status(500).send(`Error al generar presentación: ${err.message}`);
     }
 });
 
