@@ -449,11 +449,49 @@ app.put('/api/ordenes/:id', async (req, res) => {
     }
 });
 
+// Función de verificación de permisos de informes:
+// - Panatech: solo npanadisi
+// - Incanto: solo bprimo
+function verificarPermisoInformes(marca, usuario) {
+    const user = (usuario || '').toLowerCase().trim();
+    const brand = (marca || '').toLowerCase().trim();
+    if (brand === 'panatech' && user === 'npanadisi') return true;
+    if (brand === 'incanto' && user === 'bprimo') return true;
+    return false;
+}
+
 // Ruta Presentación Ejecutiva y Generador de PDF
 app.get('/reporte-presentacion', async (req, res) => {
-    const { desde, hasta, marca } = req.query;
+    const { desde, hasta, marca, usuario } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
+    const usuarioTarget = (usuario || '').toLowerCase();
     const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
+
+    if (!verificarPermisoInformes(marcaTarget, usuarioTarget)) {
+        return res.status(403).send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Acceso Restringido - Informes</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+            </head>
+            <body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+                <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 max-w-sm text-center space-y-4">
+                    <div class="text-4xl">🚫</div>
+                    <h1 class="text-xl font-bold text-rose-400">Acceso Restringido</h1>
+                    <p class="text-xs text-slate-300">
+                        No tenés permisos para visualizar los informes de <b class="uppercase">${marcaTarget}</b>.
+                    </p>
+                    <a href="/app.html?marca=${marcaTarget}&usuario=${encodeURIComponent(usuarioTarget)}" class="inline-block bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition">
+                        ← Volver al Registrador
+                    </a>
+                </div>
+            </body>
+            </html>
+        `);
+    }
 
     try {
         let query = supabase
@@ -468,7 +506,7 @@ app.get('/reporte-presentacion', async (req, res) => {
 
         if (error) return res.status(500).send(`Error al consultar datos: ${error.message}`);
 
-        const html = generarHTMLPresentacion(ordenes || [], marcaTarget, desde, hasta);
+        const html = generarHTMLPresentacion(ordenes || [], marcaTarget, desde, hasta, usuarioTarget);
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.send(html);
     } catch (err) {
@@ -478,9 +516,14 @@ app.get('/reporte-presentacion', async (req, res) => {
 
 // API Exportar EXCEL Avanzado con Dashboard, KPIs, Rankings y Análisis Profundo
 app.get('/api/ordenes/exportar', async (req, res) => {
-    const { desde, hasta, marca } = req.query;
+    const { desde, hasta, marca, usuario } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
+    const usuarioTarget = (usuario || '').toLowerCase();
     const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
+
+    if (!verificarPermisoInformes(marcaTarget, usuarioTarget)) {
+        return res.status(403).json({ error: 'Acceso restringido: No tenés permisos para exportar informes de esta marca.' });
+    }
 
     try {
         let query = supabase

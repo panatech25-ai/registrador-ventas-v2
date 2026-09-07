@@ -92,6 +92,26 @@ function configurarMarcaUI() {
             title.className = 'text-base sm:text-2xl font-black tracking-wider text-sky-400 leading-none';
         }
     }
+
+    // Permisos exclusivos para menú de Informes:
+    // Panatech -> Solo npanadisi
+    // Incanto  -> Solo bprimo
+    const btnInformes = document.getElementById('btnMenuInformes');
+    if (btnInformes) {
+        if (usuarioTienePermisoInformes()) {
+            btnInformes.classList.remove('hidden');
+        } else {
+            btnInformes.classList.add('hidden');
+        }
+    }
+}
+
+function usuarioTienePermisoInformes() {
+    const user = (USUARIO_ACTUAL || '').toLowerCase().trim();
+    const brand = (MARCA_ACTUAL || '').toLowerCase().trim();
+    if (brand === 'panatech' && user === 'npanadisi') return true;
+    if (brand === 'incanto' && user === 'bprimo') return true;
+    return false;
 }
 
 // ==========================================
@@ -715,7 +735,13 @@ function cerrarModal() {
 // ==========================================
 // MODAL EXPORTAR EXCEL AVANZADO
 // ==========================================
-function abrirModalExportar() { document.getElementById('modalExportar').classList.remove('hidden'); }
+function abrirModalExportar() { 
+    if (!usuarioTienePermisoInformes()) {
+        showToast('No tenés permisos para acceder al menú de informes.', 'warning');
+        return;
+    }
+    document.getElementById('modalExportar').classList.remove('hidden'); 
+}
 function cerrarModalExportar() { document.getElementById('modalExportar').classList.add('hidden'); }
 
 function setPresetExport(tipo) {
@@ -737,30 +763,42 @@ function setPresetExport(tipo) {
 }
 
 function descargarInformeExcel() {
+    if (!usuarioTienePermisoInformes()) {
+        showToast('No tenés permisos para exportar informes.', 'error');
+        return;
+    }
     const desde = document.getElementById('exportFechaInicio').value;
     const hasta = document.getElementById('exportFechaFin').value;
     
     showToast('Generando informe completo en Excel...', 'info');
-    window.location.href = `/api/ordenes/exportar?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}`;
+    window.location.href = `/api/ordenes/exportar?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}&usuario=${encodeURIComponent(USUARIO_ACTUAL)}`;
     cerrarModalExportar();
 }
 
 function descargarInformePDF() {
+    if (!usuarioTienePermisoInformes()) {
+        showToast('No tenés permisos para exportar informes.', 'error');
+        return;
+    }
     const desde = document.getElementById('exportFechaInicio').value;
     const hasta = document.getElementById('exportFechaFin').value;
 
-    showToast('Generando presentación ejecutiva en PDF...', 'info');
-    const url = `/reporte-presentacion?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}&autoPdf=1`;
+    showToast('Generando informe PDF...', 'info');
+    const url = `/reporte-presentacion?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}&usuario=${encodeURIComponent(USUARIO_ACTUAL)}&autoPdf=1`;
     window.open(url, '_blank');
     cerrarModalExportar();
 }
 
 function abrirPresentacionEnPantalla() {
+    if (!usuarioTienePermisoInformes()) {
+        showToast('No tenés permisos para ver informes.', 'error');
+        return;
+    }
     const desde = document.getElementById('exportFechaInicio').value;
     const hasta = document.getElementById('exportFechaFin').value;
 
-    showToast('Abriendo informe en modo presentación...', 'info');
-    const url = `/reporte-presentacion?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}`;
+    showToast('Abriendo informe de gestión...', 'info');
+    const url = `/reporte-presentacion?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${MARCA_ACTUAL}&usuario=${encodeURIComponent(USUARIO_ACTUAL)}`;
     window.open(url, '_blank');
     cerrarModalExportar();
 }

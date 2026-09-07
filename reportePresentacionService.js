@@ -18,7 +18,7 @@ function formatearFecha(str) {
     return str;
 }
 
-function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', hasta = '') {
+function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', hasta = '', usuario = '') {
     const esIncanto = (marca || '').toLowerCase() === 'incanto';
     const marcaNombre = esIncanto ? 'INCANTO' : 'PANATECH';
     const marcaSubtitulo = esIncanto ? 'Cosmética, Fragancias y Belleza' : 'Tecnología, Audio y Bazar';
@@ -226,7 +226,7 @@ function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', h
     <header class="no-print sticky top-2 z-50 w-full max-w-4xl bg-slate-900/95 backdrop-blur-md border border-slate-700/90 p-2.5 sm:p-3.5 rounded-2xl shadow-2xl mb-3 sm:mb-4">
         <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-                <a href="/app.html?marca=${marca}" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Volver a la App">
+                <a href="/app.html?marca=${marca}&usuario=${encodeURIComponent(usuario)}" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Volver a la App">
                     ← <span class="hidden sm:inline">Volver</span>
                 </a>
                 <div>
@@ -245,7 +245,7 @@ function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', h
                 <button type="button" onclick="descargarPDFDirecto()" id="btnDescargarPDF" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-[11px] sm:text-xs px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl shadow-lg transition flex items-center gap-1 active:scale-95">
                     📄 <span>PDF</span>
                 </button>
-                <a href="/api/ordenes/exportar?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${marca}" class="bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-600/50 font-bold text-[11px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl transition flex items-center gap-1">
+                <a href="/api/ordenes/exportar?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&marca=${marca}&usuario=${encodeURIComponent(usuario)}" class="bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-600/50 font-bold text-[11px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl transition flex items-center gap-1">
                     📊 <span class="hidden sm:inline">Excel</span>
                 </a>
             </div>
@@ -575,6 +575,7 @@ function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', h
     <!-- SCRIPTS DE INTERACCIÓN, FILTRADO Y DESCARGA DE PDF -->
     <script>
         const MARCA_ACTUAL = "${marca}";
+        const USUARIO_ACTUAL = "${usuario}";
 
         function toggleFiltroFechas() {
             const panel = document.getElementById('panelSelectorFechas');
@@ -613,7 +614,7 @@ function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', h
         }
 
         function irAFecha(desde, hasta) {
-            let url = '/reporte-presentacion?marca=' + encodeURIComponent(MARCA_ACTUAL);
+            let url = '/reporte-presentacion?marca=' + encodeURIComponent(MARCA_ACTUAL) + '&usuario=' + encodeURIComponent(USUARIO_ACTUAL);
             if (desde) url += '&desde=' + encodeURIComponent(desde);
             if (hasta) url += '&hasta=' + encodeURIComponent(hasta);
             window.location.href = url;
