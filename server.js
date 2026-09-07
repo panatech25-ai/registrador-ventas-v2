@@ -278,6 +278,32 @@ app.post('/api/productos/manual', async (req, res) => {
     }
 });
 
+// Helpers para persistir el estado de pago del envío (Producto abonado / Abonado total)
+function procesarObservacionesParaGuardar(observaciones = '', pago_envio = null) {
+    let texto = (observaciones || '').replace(/\s*\[PAGO_ENVIO:[^\]]+\]\s*/g, '').trim();
+    if (pago_envio === 'PRODUCTO_ABONADO' || pago_envio === 'ABONADO_TOTAL') {
+        texto = texto ? `${texto} [PAGO_ENVIO:${pago_envio}]` : `[PAGO_ENVIO:${pago_envio}]`;
+    }
+    return texto;
+}
+
+function procesarOrdenParaRespuesta(orden) {
+    if (!orden) return orden;
+    let pago_envio = null;
+    let obs = orden.observaciones || '';
+
+    if (obs.includes('[PAGO_ENVIO:ABONADO_TOTAL]')) {
+        pago_envio = 'ABONADO_TOTAL';
+        obs = obs.replace(/\[PAGO_ENVIO:ABONADO_TOTAL\]/g, '').trim();
+    } else if (obs.includes('[PAGO_ENVIO:PRODUCTO_ABONADO]')) {
+        pago_envio = 'PRODUCTO_ABONADO';
+        obs = obs.replace(/\[PAGO_ENVIO:PRODUCTO_ABONADO\]/g, '').trim();
+    }
+    orden.pago_envio = pago_envio;
+    orden.observaciones = obs;
+    return orden;
+}
+
 // API Últimas Órdenes (Incluye orden_detalles y productos para acciones rápidas)
 app.get('/api/ordenes/ultimas', async (req, res) => {
     const { marca, limite } = req.query;
@@ -294,7 +320,7 @@ app.get('/api/ordenes/ultimas', async (req, res) => {
             .limit(limitNum);
 
         if (error) throw error;
-        res.json(data || []);
+        res.json((data || []).map(procesarOrdenParaRespuesta));
     } catch (err) {
         res.json([]);
     }
@@ -302,7 +328,7 @@ app.get('/api/ordenes/ultimas', async (req, res) => {
 
 // API Crear Orden
 app.post('/api/ordenes', async (req, res) => {
-    const { fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, productos, total, estado, metodo_pago, marca } = req.body;
+    const { fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, productos, total, estado, metodo_pago, marca, pago_envio } = req.body;
 
     try {
         const marcaTarget = (marca || 'panatech').toLowerCase();
@@ -314,11 +340,12 @@ app.post('/api/ordenes', async (req, res) => {
             .ilike('numero_orden', `${prefijo}%`);
 
         const numero_orden = `${prefijo}-${1000 + (count || 0) + 1}`;
+        const obsFinal = procesarObservacionesParaGuardar(observaciones, pago_envio);
 
         const { data: orden, error: errOrden } = await supabase
             .from('ordenes')
             .insert([{
-                numero_orden, fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Sin especificar'
+                numero_orden, fecha, vendedor, cliente_nombre, cliente_telefono, observaciones: obsFinal, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Sin especificar'
             }])
             .select()
             .single();
@@ -343,7 +370,7 @@ app.post('/api/ordenes', async (req, res) => {
             }
         }
 
-        res.json({ success: true, numero_orden, id: orden.id });
+        res.json({ success: true, numero_orden, id: orden.id, pago_envio });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -369,7 +396,7 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
         .single();
 
     if (error || !orden) return res.status(404).json({ error: 'Orden no encontrada.' });
-    res.json(orden);
+    res.json(procesarOrdenParaRespuesta(orden));
 });
 
 // API Actualización Rápida de Estado (Iniciado -> Abonado -> Preparado -> Finalizado -> Cancelado)
@@ -410,15 +437,16 @@ app.patch('/api/ordenes/:id/estado', async (req, res) => {
 // API Actualizar Orden Completa
 app.put('/api/ordenes/:id', async (req, res) => {
     const { id } = req.params;
-    const { fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago, productos } = req.body;
+    const { fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago, productos, pago_envio } = req.body;
 
     try {
         const { data: ordenAnterior } = await supabase.from('ordenes').select('estado').eq('id', id).single();
         const estabaFinalizado = ordenAnterior ? ordenAnterior.estado === 'Finalizado' : false;
+        const obsFinal = procesarObservacionesParaGuardar(observaciones, pago_envio);
 
         const { error: errUpdate } = await supabase
             .from('ordenes')
-            .update({ fecha, vendedor, cliente_nombre, cliente_telefono, observaciones, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago: metodo_pago || 'Sin especificar' })
+            .update({ fecha, vendedor, cliente_nombre, cliente_telefono, observaciones: obsFinal, modo_entrega, cadete, direccion_envio, costo_envio, horario_envio, total, estado, metodo_pago: metodo_pago || 'Sin especificar' })
             .eq('id', id);
 
         if (errUpdate) throw errUpdate;

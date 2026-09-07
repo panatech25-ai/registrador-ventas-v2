@@ -480,7 +480,7 @@ async function generarReporteVentasAvanzado(ordenes = [], marca = 'panatech', de
             costo_envio: parseFloat(o.costo_envio) || 0,
             estado: o.estado || 'Iniciado',
             total: parseFloat(o.total) || 0,
-            observaciones: o.observaciones || ''
+            observaciones: (o.observaciones || '').replace(/\s*\[PAGO_ENVIO:[^\]]+\]\s*/g, '').trim()
         });
 
         row.getCell('costo_envio').numFmt = '$#,##0.00';

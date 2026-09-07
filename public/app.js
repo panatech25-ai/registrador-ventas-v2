@@ -188,6 +188,11 @@ function seleccionarPagoEnvio(idSeleccionado) {
         chkTotal.checked = false;
     } else if (idSeleccionado === 'chk_abonado_total' && chkTotal.checked) {
         chkProd.checked = false;
+        const estSelect = document.getElementById('estado_pedido');
+        if (estSelect && estSelect.value === 'Iniciado') {
+            estSelect.value = 'Abonado';
+            actualizarColorEstado('Abonado');
+        }
     }
 }
 
@@ -392,6 +397,13 @@ async function guardarOrden(e) {
     const subtotal = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
     const costoEnvio = parseFloat(document.getElementById('costo_envio').value) || 0;
 
+    let pago_envio = null;
+    if (document.getElementById('chk_abonado_total')?.checked) {
+        pago_envio = 'ABONADO_TOTAL';
+    } else if (document.getElementById('chk_prod_abonado')?.checked) {
+        pago_envio = 'PRODUCTO_ABONADO';
+    }
+
     const payload = {
         fecha: document.getElementById('fecha').value,
         vendedor: document.getElementById('vendedor').value,
@@ -407,7 +419,8 @@ async function guardarOrden(e) {
         metodo_pago: document.getElementById('metodo_pago').value,
         productos: carrito,
         total: subtotal + costoEnvio,
-        marca: MARCA_ACTUAL
+        marca: MARCA_ACTUAL,
+        pago_envio: pago_envio
     };
 
     try {
@@ -494,6 +507,12 @@ async function buscarOrden() {
         }
 
         toggleEnvioFields();
+
+        // Restaurar estado de pago de envío
+        const chkProd = document.getElementById('chk_prod_abonado');
+        const chkTotal = document.getElementById('chk_abonado_total');
+        if (chkProd) chkProd.checked = (data.pago_envio === 'PRODUCTO_ABONADO');
+        if (chkTotal) chkTotal.checked = (data.pago_envio === 'ABONADO_TOTAL');
 
         carrito = (data.orden_detalles || []).map(d => ({
             id: d.producto_id,
@@ -1046,8 +1065,8 @@ function imprimirEtiquetaUltima() {
 
 function imprimirEtiquetaDirecta(orden) {
     if (!orden) return;
-    const chkProd = false;
-    const chkTotal = orden.estado === 'Abonado' || orden.estado === 'Finalizado';
+    const chkProd = orden.pago_envio === 'PRODUCTO_ABONADO';
+    const chkTotal = orden.pago_envio === 'ABONADO_TOTAL' || (!orden.pago_envio && (orden.estado === 'Abonado' || orden.estado === 'Finalizado'));
 
     imprimirTicketPlantilla(
         orden.cliente_nombre,
