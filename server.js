@@ -44,26 +44,54 @@ app.get('/', (req, res) => {
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <link rel="icon" type="image/png" href="/logos/favicon.png">
         <link rel="manifest" href="/manifest.json">
-        <title>Registrador de Ventas</title>
+        <title>Selección de Emprendimiento - Registrador</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+            body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        </style>
     </head>
-    <body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
-        <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 w-full max-w-md text-center space-y-6">
-            <h1 class="text-2xl font-bold tracking-wide text-slate-100">Registrador de Ventas</h1>
-            <p class="text-sm text-slate-400">Seleccioná la marca para ingresar</p>
+    <body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4">
+        <div class="bg-slate-900/90 p-6 sm:p-8 rounded-3xl shadow-2xl border border-slate-800 w-full max-w-md text-center space-y-6 backdrop-blur">
+            <div>
+                <span class="text-xs uppercase tracking-widest font-bold text-slate-400 bg-slate-800/80 px-3 py-1 rounded-full border border-slate-700">Sistema de Ventas</span>
+                <h1 class="text-2xl sm:text-3xl font-black tracking-wide text-white mt-3">Seleccionar Emprendimiento</h1>
+                <p class="text-xs text-slate-400 mt-1">Elegí la marca para gestionar pedidos y stock</p>
+            </div>
             
-            <div class="grid grid-cols-2 gap-4 pt-2">
-                <a href="/login/panatech" class="flex items-center justify-center bg-slate-900 hover:bg-slate-950 p-6 rounded-2xl border border-sky-500/30 hover:border-sky-500 transition transform hover:-translate-y-1 shadow-lg group">
-                    <img src="/logos/panatech.png" alt="Panatech" class="w-24 h-24 object-contain group-hover:scale-105 transition" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
+            <div class="grid grid-cols-2 gap-3 sm:gap-4 pt-1">
+                <!-- Tarjeta Panatech -->
+                <a href="/login/panatech" class="flex flex-col items-center justify-center bg-slate-800/70 hover:bg-slate-800 p-5 rounded-2xl border border-sky-500/30 hover:border-sky-400 transition-all transform hover:-translate-y-1 shadow-lg group active:scale-95">
+                    <div class="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 rounded-2xl p-2 border border-slate-700/60 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
+                        <img src="/logos/panatech.png" alt="Panatech" class="max-w-full max-h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
+                    </div>
+                    <span class="mt-3 text-sm sm:text-base font-extrabold text-sky-400 tracking-wider">PANATECH</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Tecnología y Bazar</span>
                 </a>
-                <a href="/login/incanto" class="flex items-center justify-center bg-slate-900 hover:bg-slate-950 p-6 rounded-2xl border border-rose-500/30 hover:border-rose-500 transition transform hover:-translate-y-1 shadow-lg group">
-                    <img src="/logos/incanto.png" alt="Incanto" class="w-24 h-24 object-contain group-hover:scale-105 transition" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
+
+                <!-- Tarjeta Incanto -->
+                <a href="/login/incanto" class="flex flex-col items-center justify-center bg-slate-800/70 hover:bg-slate-800 p-5 rounded-2xl border border-rose-500/30 hover:border-rose-400 transition-all transform hover:-translate-y-1 shadow-lg group active:scale-95">
+                    <div class="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 rounded-2xl p-2 border border-slate-700/60 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
+                        <img src="/logos/incanto.png" alt="Incanto" class="max-w-full max-h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3050/3050239.png'">
+                    </div>
+                    <span class="mt-3 text-sm sm:text-base font-extrabold text-rose-400 tracking-wider">INCANTO</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Cosmética y Belleza</span>
                 </a>
             </div>
+            
+            <div class="text-[10px] text-slate-500 border-t border-slate-800/80 pt-3">
+                Panatech & Incanto • Registrador Oficial de Ventas
+            </div>
         </div>
+        
+        <script>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            }
+        </script>
     </body>
     </html>
     `);

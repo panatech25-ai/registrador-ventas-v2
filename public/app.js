@@ -1,6 +1,9 @@
 let carrito = [];
 let params = new URLSearchParams(window.location.search);
-let MARCA_ACTUAL = (params.get('marca') || 'panatech').toLowerCase();
+if (!params.get('marca')) {
+    window.location.href = '/';
+}
+let MARCA_ACTUAL = (params.get('marca') || '').toLowerCase();
 let USUARIO_ACTUAL = params.get('usuario') || 'vendedor';
 let ultimasOrdenesMemoria = [];
 let html5QrCodeScanner = null;
