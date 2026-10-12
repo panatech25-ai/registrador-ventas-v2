@@ -202,10 +202,12 @@ function aplicarPermisosEnUI() {
     const sideNavMayorista = document.getElementById('sideNavMayorista');
     const bottomNavMayorista = document.getElementById('bottomNavMayorista');
     if (sideNavMayorista) {
+        sideNavMayorista.style.display = puedeMayorista ? 'flex' : 'none';
         if (puedeMayorista) sideNavMayorista.classList.remove('hidden');
         else sideNavMayorista.classList.add('hidden');
     }
     if (bottomNavMayorista) {
+        bottomNavMayorista.style.display = puedeMayorista ? 'flex' : 'none';
         if (puedeMayorista) bottomNavMayorista.classList.remove('hidden');
         else bottomNavMayorista.classList.add('hidden');
     }
@@ -702,6 +704,14 @@ function filtrarEnviosPendientes() {
 let SECCION_ACTUAL = 'nueva';
 
 function cambiarSeccion(seccion) {
+    const esIncanto = MARCA_ACTUAL === 'incanto';
+    const puedeMayorista = esIncanto && (ES_ADMIN || !!PERMISOS_ACTUALES.mayorista);
+
+    // Si intentan navegar a mayorista sin ser Incanto o sin permisos, redirigir a 'nueva'
+    if (seccion === 'mayorista' && !puedeMayorista) {
+        seccion = 'nueva';
+    }
+
     SECCION_ACTUAL = seccion;
     const secNueva = document.getElementById('seccionNuevaOrden');
     const secBusqueda = document.getElementById('seccionBusquedaOrdenes');
@@ -715,11 +725,22 @@ function cambiarSeccion(seccion) {
     const bNavBusqueda = document.getElementById('bottomNavBusqueda');
     const bNavMayorista = document.getElementById('bottomNavMayorista');
 
-    const esIncanto = MARCA_ACTUAL === 'incanto';
     const bgActivo = esIncanto ? 'bg-rose-600' : 'bg-sky-600';
     const textActivo = esIncanto ? 'text-rose-400' : 'text-sky-400';
 
     const kpisSuperiores = document.getElementById('contenedorKpisSuperiores');
+
+    // Manejo de visibilidad estricta de Incanto Mayorista (incluso para admin en Panatech)
+    if (sideMayorista) {
+        sideMayorista.style.display = puedeMayorista ? 'flex' : 'none';
+        if (!puedeMayorista) sideMayorista.classList.add('hidden');
+        else sideMayorista.classList.remove('hidden');
+    }
+    if (bNavMayorista) {
+        bNavMayorista.style.display = puedeMayorista ? 'flex' : 'none';
+        if (!puedeMayorista) bNavMayorista.classList.add('hidden');
+        else bNavMayorista.classList.remove('hidden');
+    }
 
     if (seccion === 'nueva') {
         if (secNueva) secNueva.classList.remove('hidden');
@@ -734,7 +755,7 @@ function cambiarSeccion(seccion) {
         if (sideBusqueda) {
             sideBusqueda.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
         }
-        if (sideMayorista) {
+        if (sideMayorista && puedeMayorista) {
             sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40";
         }
 
@@ -745,7 +766,7 @@ function cambiarSeccion(seccion) {
         if (bNavBusqueda) {
             bNavBusqueda.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
         }
-        if (bNavMayorista) {
+        if (bNavMayorista && puedeMayorista) {
             bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-pink-400";
         }
 
@@ -763,7 +784,7 @@ function cambiarSeccion(seccion) {
         if (sideBusqueda) {
             sideBusqueda.className = `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg`;
         }
-        if (sideMayorista) {
+        if (sideMayorista && puedeMayorista) {
             sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40";
         }
 
@@ -774,14 +795,14 @@ function cambiarSeccion(seccion) {
         if (bNavBusqueda) {
             bNavBusqueda.className = `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo}`;
         }
-        if (bNavMayorista) {
+        if (bNavMayorista && puedeMayorista) {
             bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-pink-400";
         }
 
         // Si la lista está vacía o es la primera vez que se entra, buscar órdenes
         ejecutarBusquedaAvanzada();
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (seccion === 'mayorista') {
+    } else if (seccion === 'mayorista' && puedeMayorista) {
         if (secNueva) secNueva.classList.add('hidden');
         if (secBusqueda) secBusqueda.classList.add('hidden');
         if (secMayorista) secMayorista.classList.remove('hidden');
