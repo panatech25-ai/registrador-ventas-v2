@@ -5,7 +5,16 @@ const path = require('path');
 const { generarReporteVentasAvanzado } = require('./excelService');
 const { generarHTMLPresentacion } = require('./reportePresentacionService');
 const { generarHTMLReporteMayorista } = require('./reporteMayoristaService');
-const { sincronizarProductosPanatech, obtenerMetadataPanatech, guardarMetadataPanatech } = require('./panatechScraperService');
+const {
+    sincronizarProductosMarca,
+    sincronizarProductosPanatech,
+    sincronizarProductosIncanto,
+    obtenerMetadataMarca,
+    obtenerMetadataPanatech,
+    guardarMetadataMarca,
+    guardarMetadataPanatech,
+    fetchAllDbProductsByBrand
+} = require('./panatechScraperService');
 
 const app = express();
 app.use(express.json());
@@ -329,31 +338,31 @@ app.get('/api/metricas/hoy', async (req, res) => {
     }
 });
 
-// API Catálogo Completo de Productos (con imágenes, filtros y stock)
+// API Catálogo Completo de Productos (con imágenes, filtros y stock para Panatech e Incanto)
 app.get('/api/productos/catalogo', async (req, res) => {
     const { q, marca, stock_filter, sort } = req.query;
     const marcaTarget = (marca || 'panatech').toLowerCase();
 
     try {
-        let query = supabase
-            .from('productos')
-            .select('*')
-            .eq('marca', marcaTarget);
-
+        let items = [];
         if (q && q.trim().length > 0) {
             const termino = q.trim();
-            query = query.or(`nombre.ilike.%${termino}%,codigo_sku.ilike.%${termino}%,variante.ilike.%${termino}%`);
+            const { data, error } = await supabase
+                .from('productos')
+                .select('*')
+                .eq('marca', marcaTarget)
+                .or(`nombre.ilike.%${termino}%,codigo_sku.ilike.%${termino}%,variante.ilike.%${termino}%`)
+                .limit(2000);
+            if (error) throw error;
+            items = data || [];
+        } else {
+            items = await fetchAllDbProductsByBrand(supabase, marcaTarget);
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-
-        let items = data || [];
-
-        // Enriquecer con metadatos si es Panatech
+        // Enriquecer con metadatos de tienda web tanto en Panatech como en Incanto
         let metadata = {};
-        if (marcaTarget === 'panatech') {
-            metadata = await obtenerMetadataPanatech(supabase);
+        if (marcaTarget === 'panatech' || marcaTarget === 'incanto') {
+            metadata = await obtenerMetadataMarca(supabase, marcaTarget);
         }
 
         let productosEnriquecidos = items.map(p => {
@@ -377,8 +386,9 @@ app.get('/api/productos/catalogo', async (req, res) => {
                 unificadosMap.set(norm, p);
             } else {
                 const existente = unificadosMap.get(norm);
-                // Si el nuevo tiene stock > 0 y el existente no, preferir el que tiene stock
-                if (p.stock > existente.stock) {
+                // Preferir el que está sincronizado con web y tiene foto, o el que tiene mayor stock
+                const nuevoMejor = (p.synced_web && !existente.synced_web) || (p.stock > existente.stock && p.synced_web === existente.synced_web);
+                if (nuevoMejor) {
                     unificadosMap.set(norm, p);
                 }
             }
@@ -421,21 +431,35 @@ app.get('/api/productos/catalogo', async (req, res) => {
     }
 });
 
-// API Sincronizar catálogo de Panatech desde la tienda online
-app.post('/api/panatech/sync-web', async (req, res) => {
+// API Sincronizar catálogo desde la tienda online (Panatech o Incanto)
+app.post('/api/productos/sync-web', async (req, res) => {
+    const marcaTarget = ((req.body && req.body.marca) || req.query.marca || 'panatech').toLowerCase();
     try {
-        const resultado = await sincronizarProductosPanatech(supabase);
+        const resultado = await sincronizarProductosMarca(supabase, marcaTarget);
         res.json(resultado);
     } catch (err) {
-        console.error('Error al sincronizar Panatech con web:', err);
+        console.error(`Error al sincronizar ${marcaTarget} con web:`, err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Alias retrocompatible para Panatech
+app.post('/api/panatech/sync-web', async (req, res) => {
+    const marcaTarget = ((req.body && req.body.marca) || req.query.marca || 'panatech').toLowerCase();
+    try {
+        const resultado = await sincronizarProductosMarca(supabase, marcaTarget);
+        res.json(resultado);
+    } catch (err) {
+        console.error('Error al sincronizar con web:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
 // API Info de última sincronización
 app.get('/api/panatech/sync-info', async (req, res) => {
+    const marcaTarget = (req.query.marca || 'panatech').toLowerCase();
     try {
-        const metadata = await obtenerMetadataPanatech(supabase);
+        const metadata = await obtenerMetadataMarca(supabase, marcaTarget);
         res.json({ success: true, info: metadata._info || null });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -463,8 +487,8 @@ app.get('/api/productos/buscar', async (req, res) => {
         if (error) throw error;
 
         let items = data || [];
-        if (marcaTarget === 'panatech') {
-            const metadata = await obtenerMetadataPanatech(supabase);
+        if (marcaTarget === 'panatech' || marcaTarget === 'incanto') {
+            const metadata = await obtenerMetadataMarca(supabase, marcaTarget);
             items = items.map(p => ({
                 ...p,
                 imagen_url: metadata[p.id]?.imagen_url || '/img/no-image.svg'
@@ -547,8 +571,9 @@ app.post('/api/productos/unificar', async (req, res) => {
         }
 
         // 4. Trasladar metadata si el conservado no tenía y el eliminado sí
-        if (prodConservar.marca === 'panatech') {
-            const metadata = await obtenerMetadataPanatech(supabase);
+        if (prodConservar.marca === 'panatech' || prodConservar.marca === 'incanto') {
+            const marcaProd = prodConservar.marca;
+            const metadata = await obtenerMetadataMarca(supabase, marcaProd);
             const metaEliminado = metadata[prodEliminar.id];
             const metaConservar = metadata[prodConservar.id];
 
@@ -560,7 +585,7 @@ app.post('/api/productos/unificar', async (req, res) => {
                 };
             }
             delete metadata[prodEliminar.id];
-            await guardarMetadataPanatech(supabase, metadata);
+            await guardarMetadataMarca(supabase, metadata, marcaProd);
         }
 
         // 5. Eliminar el producto absorbido de la tabla productos (sus órdenes ya fueron migradas)

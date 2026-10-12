@@ -1216,15 +1216,19 @@ function abrirModalStock() {
             : 'text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-800';
     }
 
+    const urlTiendaNombre = esPanatech ? 'panatech.com.ar' : 'incantorosario.com.ar';
     if (subtitulo) {
-        subtitulo.innerHTML = esPanatech
-            ? 'Precios en <span class="text-emerald-400 font-semibold">Efectivo o Transferencia</span> sincronizados con la tienda oficial'
-            : 'Gestión de precios y control de inventario de Incanto';
+        subtitulo.innerHTML = `Precios en <span class="text-emerald-400 font-semibold">Efectivo o Transferencia</span> sincronizados con <span class="${esPanatech ? 'text-sky-400' : 'text-rose-400'} font-semibold">${urlTiendaNombre}</span>`;
     }
 
-    if (btnSync) btnSync.style.display = esPanatech ? 'flex' : 'none';
-    if (pillWeb) pillWeb.style.display = esPanatech ? 'inline-block' : 'none';
-    if (pillManual) pillManual.style.display = esPanatech ? 'inline-block' : 'none';
+    if (btnSync) {
+        btnSync.style.display = 'flex';
+        btnSync.className = esPanatech
+            ? 'bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95'
+            : 'bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95';
+    }
+    if (pillWeb) pillWeb.style.display = 'inline-block';
+    if (pillManual) pillManual.style.display = 'inline-block';
 
     // Cargar productos
     cargarCatalogoProductos();
@@ -1262,10 +1266,11 @@ async function cargarCatalogoProductos() {
             // Info de sincronización
             const infoSync = document.getElementById('infoUltimaSyncHeader');
             if (infoSync) {
-                if (MARCA_ACTUAL === 'panatech' && data.syncInfo && data.syncInfo.ultima_sincronizacion) {
+                if ((MARCA_ACTUAL === 'panatech' || MARCA_ACTUAL === 'incanto') && data.syncInfo && data.syncInfo.ultima_sincronizacion) {
                     const fecha = new Date(data.syncInfo.ultima_sincronizacion);
                     const fechaTxt = fecha.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-                    infoSync.innerHTML = `Última sincronización web: <span class="text-sky-400 font-semibold">${fechaTxt}</span> (${data.syncInfo.total_web || 0} en tienda)`;
+                    const colorMarca = MARCA_ACTUAL === 'panatech' ? 'text-sky-400' : 'text-rose-400';
+                    infoSync.innerHTML = `Última sincronización web: <span class="${colorMarca} font-semibold">${fechaTxt}</span> (${data.syncInfo.total_web || 0} en tienda)`;
                 } else {
                     infoSync.textContent = '';
                 }
@@ -1487,7 +1492,7 @@ function renderizarCatalogoFiltrado() {
     }).join('');
 }
 
-// Sincronización Web con la tienda online panatech.com.ar
+// Sincronización Web con la tienda online (panatech.com.ar o incantorosario.com.ar)
 async function ejecutarSincronizacionWebPanatech() {
     const btn = document.getElementById('btnSyncWebPanatech');
     const icon = document.getElementById('iconSyncWeb');
@@ -1497,12 +1502,14 @@ async function ejecutarSincronizacionWebPanatech() {
     if (icon) icon.className = 'inline-block animate-spin';
     if (text) text.textContent = 'Sincronizando Tienda...';
 
-    showToast('Iniciando lectura y unificación de productos desde panatech.com.ar...', 'info');
+    const dominioTienda = MARCA_ACTUAL === 'incanto' ? 'incantorosario.com.ar' : 'panatech.com.ar';
+    showToast(`Iniciando lectura y unificación de productos desde ${dominioTienda}...`, 'info');
 
     try {
-        const res = await fetch('/api/panatech/sync-web', {
+        const res = await fetch('/api/productos/sync-web', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ marca: MARCA_ACTUAL })
         });
         const data = await res.json();
 
