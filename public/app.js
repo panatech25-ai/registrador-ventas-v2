@@ -69,10 +69,11 @@ function showToast(mensaje, tipo = 'success') {
 // ==========================================
 // Almacenamiento local de permisos del usuario actual
 let PERMISOS_ACTUALES = {
-    nueva_orden: true,
-    busqueda: true,
-    stock: true,
-    informes: false
+    nueva_orden: false,
+    busqueda: false,
+    stock: false,
+    informes: false,
+    mayorista: false
 };
 let ES_ADMIN = false;
 
@@ -147,31 +148,35 @@ async function cargarPermisosUsuario() {
 }
 
 function aplicarPermisosEnUI() {
+    const puedeNueva = ES_ADMIN || !!PERMISOS_ACTUALES.nueva_orden;
+    const puedeBusqueda = ES_ADMIN || !!PERMISOS_ACTUALES.busqueda;
+    const puedeStock = ES_ADMIN || !!PERMISOS_ACTUALES.stock;
+    const puedeInformes = ES_ADMIN || !!PERMISOS_ACTUALES.informes;
+
+    const esIncanto = MARCA_ACTUAL === 'incanto';
+    const puedeMayorista = esIncanto && (ES_ADMIN || !!PERMISOS_ACTUALES.mayorista);
+
     // 1. Botón de Nueva Orden
     const sideNavNueva = document.getElementById('sideNavNueva');
     const bottomNavNueva = document.getElementById('bottomNavNueva');
-    const puedeNueva = ES_ADMIN || PERMISOS_ACTUALES.nueva_orden !== false;
     if (sideNavNueva) sideNavNueva.style.display = puedeNueva ? 'flex' : 'none';
     if (bottomNavNueva) bottomNavNueva.style.display = puedeNueva ? 'flex' : 'none';
 
     // 2. Botón de Búsqueda
     const sideNavBusqueda = document.getElementById('sideNavBusqueda');
     const bottomNavBusqueda = document.getElementById('bottomNavBusqueda');
-    const puedeBusqueda = ES_ADMIN || PERMISOS_ACTUALES.busqueda !== false;
     if (sideNavBusqueda) sideNavBusqueda.style.display = puedeBusqueda ? 'flex' : 'none';
     if (bottomNavBusqueda) bottomNavBusqueda.style.display = puedeBusqueda ? 'flex' : 'none';
 
     // 3. Botón de Stock / Precios
-    const sideStockBtn = document.querySelector('aside button[onclick*="abrirModalStock"]');
-    const bottomStockBtn = document.querySelector('nav button[onclick*="abrirModalStock"]');
-    const puedeStock = ES_ADMIN || PERMISOS_ACTUALES.stock !== false;
+    const sideStockBtn = document.getElementById('sideNavStock') || document.querySelector('aside button[onclick*="abrirModalStock"]');
+    const bottomStockBtn = document.getElementById('bottomNavStock') || document.querySelector('nav button[onclick*="abrirModalStock"]');
     if (sideStockBtn) sideStockBtn.style.display = puedeStock ? 'flex' : 'none';
     if (bottomStockBtn) bottomStockBtn.style.display = puedeStock ? 'flex' : 'none';
 
     // 4. Botón de Informes
     const btnInformes = document.getElementById('btnMenuInformes');
     const bottomNavInformes = document.getElementById('bottomNavInformes');
-    const puedeInformes = ES_ADMIN || !!PERMISOS_ACTUALES.informes;
     if (btnInformes) {
         if (puedeInformes) btnInformes.classList.remove('hidden');
         else btnInformes.classList.add('hidden');
@@ -194,8 +199,6 @@ function aplicarPermisosEnUI() {
     }
 
     // 6. Botón Incanto Mayorista (SOLO para Incanto y si tiene permiso o es admin)
-    const esIncanto = MARCA_ACTUAL === 'incanto';
-    const puedeMayorista = esIncanto && (ES_ADMIN || !!PERMISOS_ACTUALES.mayorista);
     const sideNavMayorista = document.getElementById('sideNavMayorista');
     const bottomNavMayorista = document.getElementById('bottomNavMayorista');
     if (sideNavMayorista) {
@@ -207,9 +210,13 @@ function aplicarPermisosEnUI() {
         else bottomNavMayorista.classList.add('hidden');
     }
 
-    // Si el usuario no tiene permiso para la sección inicial ('nueva'), cambiar a 'busqueda'
-    if (!puedeNueva && puedeBusqueda && SECCION_ACTUAL === 'nueva') {
-        cambiarSeccion('busqueda');
+    // Lógica de redirección de sección inicial según permisos:
+    if (!puedeNueva && SECCION_ACTUAL === 'nueva') {
+        if (puedeMayorista) {
+            cambiarSeccion('mayorista');
+        } else if (puedeBusqueda) {
+            cambiarSeccion('busqueda');
+        }
     }
 }
 
