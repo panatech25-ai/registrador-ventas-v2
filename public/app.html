@@ -32,98 +32,131 @@
         .toast-animate-out { animation: toastOut 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col justify-between">
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col md:flex-row">
 
     <!-- Toast Notifications Container -->
     <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3"></div>
 
-    <!-- Header App -->
-    <header class="bg-slate-800/95 border-b border-slate-700/80 backdrop-blur sticky top-0 z-40 shadow-md">
-        <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 sm:gap-3">
-                <img id="brandLogo" src="/logos/panatech.png" alt="Logo" class="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-full bg-slate-900 p-1 border border-slate-700 shadow" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
-                <div>
-                    <h1 id="brandTitle" class="text-base sm:text-2xl font-black tracking-wider text-sky-400 leading-none">PANATECH</h1>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 tracking-wider uppercase font-semibold mt-0.5">Registrador de Ventas</p>
+    <!-- ======================================================== -->
+    <!-- BARRA LATERAL IZQUIERDA EN PC (DESKTOP SIDEBAR)           -->
+    <!-- ======================================================== -->
+    <aside class="hidden md:flex flex-col justify-between w-64 bg-slate-800/95 border-r border-slate-700/80 p-4 sticky top-0 h-screen z-40 backdrop-blur shadow-2xl flex-shrink-0">
+        <div class="space-y-6">
+            <!-- Brand Logo & Título -->
+            <div class="flex items-center gap-3 px-2 py-1">
+                <img id="brandLogo" src="/logos/panatech.png" alt="Logo" class="w-10 h-10 object-contain rounded-full bg-slate-900 p-1 border border-slate-700 shadow" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
+                <div class="overflow-hidden">
+                    <h1 id="brandTitle" class="text-xl font-black tracking-wider text-sky-400 leading-tight truncate">PANATECH</h1>
+                    <p class="text-[10px] text-slate-400 tracking-wider uppercase font-semibold">Registrador</p>
                 </div>
             </div>
 
-            <!-- Navegación Desktop (Pestañas) & Botones de Acción -->
-            <div class="flex items-center gap-1.5 sm:gap-2">
-                <!-- Pestañas Desktop -->
-                <div class="hidden md:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 mr-2">
-                    <button type="button" id="tabNavNueva" onclick="cambiarSeccion('nueva')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-sky-600 text-white shadow">
-                        ➕ <span>Nueva Orden</span>
-                    </button>
-                    <button type="button" id="tabNavBusqueda" onclick="cambiarSeccion('busqueda')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition">
-                        🔍 <span>Búsqueda de Órdenes</span>
-                    </button>
-                </div>
-
-                <button type="button" onclick="abrirModalStock()" class="bg-slate-700/90 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1">
-                    🏷️ <span class="hidden sm:inline">Stock / Precios</span><span class="sm:hidden">Stock</span>
+            <!-- Botones del Menú Lateral -->
+            <nav class="space-y-2">
+                <!-- Botón Nueva Orden -->
+                <button type="button" id="sideNavNueva" onclick="cambiarSeccion('nueva')" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition bg-sky-600 text-white shadow-lg">
+                    <span class="text-base">➕</span>
+                    <span>Nueva Orden</span>
                 </button>
-                <button id="btnMenuInformes" type="button" onclick="abrirModalExportar()" class="bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 border border-emerald-500/40 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1.5">
-                    📊 <span>Informes</span>
+
+                <!-- Botón Búsqueda de Órdenes -->
+                <button type="button" id="sideNavBusqueda" onclick="cambiarSeccion('busqueda')" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent">
+                    <span class="text-base">🔍</span>
+                    <span>Búsqueda de Órdenes</span>
                 </button>
-                <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-600/50 p-1.5 sm:p-2 rounded-lg text-xs font-semibold transition" title="Cambiar de marca / Salir">
-                    🚪
-                </a>
-            </div>
+
+                <!-- Botón Stock / Precios -->
+                <button type="button" onclick="abrirModalStock()" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-amber-400 hover:bg-slate-700/70 transition border border-amber-500/20 bg-slate-900/40">
+                    <span class="text-base">🏷️</span>
+                    <span>Stock / Precios</span>
+                </button>
+
+                <!-- Botón Informes (Solo si tiene permiso) -->
+                <button id="btnMenuInformes" type="button" onclick="abrirModalExportar()" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-emerald-300 hover:bg-slate-700/70 transition border border-emerald-500/30 bg-emerald-950/40">
+                    <span class="text-base">📊</span>
+                    <span>Informes</span>
+                </button>
+            </nav>
         </div>
-    </header>
 
-    <!-- Mini Dashboard de Métricas Rápidas del Día -->
-    <section class="max-w-7xl mx-auto px-4 pt-3 pb-1 w-full">
-        <div class="grid grid-cols-3 gap-2 sm:gap-4 bg-slate-800/80 border border-slate-700/70 p-2.5 sm:p-3 rounded-2xl shadow-lg">
-            <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-                <div class="text-base sm:text-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-1.5 sm:p-2 rounded-lg">💰</div>
-                <div>
-                    <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Ventas de Hoy</div>
-                    <div id="kpiVentasHoy" class="text-xs sm:text-lg font-black text-emerald-400">$0.00</div>
-                </div>
-            </div>
-            <div onclick="irABusquedaConFiltro('TODOS')" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900/90 hover:border-sky-500/40 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver todos los pedidos de hoy">
-                <div class="text-base sm:text-2xl bg-sky-500/10 group-hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 p-1.5 sm:p-2 rounded-lg transition">📋</div>
-                <div>
-                    <div class="text-[9px] sm:text-[11px] text-slate-400 group-hover:text-sky-300 font-bold uppercase tracking-wider transition">Pedidos Hoy</div>
-                    <div id="kpiOrdenesHoy" class="text-xs sm:text-lg font-black text-sky-400">0</div>
-                </div>
-            </div>
-            <div onclick="irABusquedaConFiltro('ENVIOS_PENDIENTES')" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900 hover:border-amber-500/50 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver lista de envíos pendientes">
-                <div class="text-base sm:text-2xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 p-1.5 sm:p-2 rounded-lg transition">🛵</div>
-                <div>
-                    <div class="text-[9px] sm:text-[11px] text-slate-400 group-hover:text-amber-300 font-bold uppercase tracking-wider transition">Envíos Pendientes</div>
-                    <div id="kpiEnviosPendientes" class="text-xs sm:text-lg font-black text-amber-400">0</div>
-                </div>
-            </div>
+        <!-- Footer del Menú Lateral: Salir / Cambiar marca -->
+        <div class="pt-4 border-t border-slate-700/80">
+            <a href="/" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-700/60 transition">
+                <span class="text-base">🚪</span>
+                <span>Cambiar Emprendimiento</span>
+            </a>
         </div>
-    </section>
+    </aside>
 
-    <!-- Contenido Principal -->
-    <main class="max-w-7xl mx-auto px-4 py-3 sm:py-4 w-full flex-grow mb-16 md:mb-4">
+    <!-- ======================================================== -->
+    <!-- CONTENIDO DERECHO (Móvil y Escritorio)                    -->
+    <!-- ======================================================== -->
+    <div class="flex-1 flex flex-col min-w-0">
 
-        <!-- ======================================================== -->
-        <!-- SECCIÓN 1: PANTALLA PRINCIPAL / FORMULARIO NUEVA ORDEN   -->
-        <!-- ======================================================== -->
-        <section id="seccionNuevaOrden" class="space-y-4">
-            <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5 max-w-4xl mx-auto">
-                
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
+        <!-- Header App (Principalmente para celular y barra superior) -->
+        <header class="bg-slate-800/95 border-b border-slate-700/80 backdrop-blur sticky top-0 z-30 shadow-md">
+            <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <img id="brandLogoMobile" src="/logos/panatech.png" alt="Logo" class="md:hidden w-8 h-8 object-contain rounded-full bg-slate-900 p-1 border border-slate-700 shadow" onerror="this.src='https://cdn-icons-png.flaticon.com/512/891/891462.png'">
                     <div>
+                        <h1 id="brandTitleMobile" class="md:hidden text-base font-black tracking-wider text-sky-400 leading-none">PANATECH</h1>
+                        <p class="text-[10px] text-slate-400 tracking-wider uppercase font-semibold">Sistema de Ventas</p>
+                    </div>
+                </div>
+
+                <!-- Botones Superiores: En celular solo queda el botón para salir; en desktop se mantiene limpio -->
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-600/50 p-1.5 sm:p-2 rounded-lg text-xs font-semibold transition" title="Cambiar de marca / Salir">
+                        🚪 <span class="hidden sm:inline text-xs ml-1">Salir</span>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Mini Dashboard de Métricas Rápidas del Día -->
+        <section class="max-w-7xl mx-auto px-4 pt-3 pb-1 w-full">
+            <div class="grid grid-cols-3 gap-2 sm:gap-4 bg-slate-800/80 border border-slate-700/70 p-2.5 sm:p-3 rounded-2xl shadow-lg">
+                <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+                    <div class="text-base sm:text-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-1.5 sm:p-2 rounded-lg">💰</div>
+                    <div>
+                        <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Ventas de Hoy</div>
+                        <div id="kpiVentasHoy" class="text-xs sm:text-lg font-black text-emerald-400">$0.00</div>
+                    </div>
+                </div>
+                <div onclick="irABusquedaConFiltro('TODOS')" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900/90 hover:border-sky-500/40 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver todos los pedidos de hoy">
+                    <div class="text-base sm:text-2xl bg-sky-500/10 group-hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 p-1.5 sm:p-2 rounded-lg transition">📋</div>
+                    <div>
+                        <div class="text-[9px] sm:text-[11px] text-slate-400 group-hover:text-sky-300 font-bold uppercase tracking-wider transition">Pedidos Hoy</div>
+                        <div id="kpiOrdenesHoy" class="text-xs sm:text-lg font-black text-sky-400">0</div>
+                    </div>
+                </div>
+                <div onclick="irABusquedaConFiltro('ENVIOS_PENDIENTES')" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900 hover:border-amber-500/50 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver lista de envíos pendientes">
+                    <div class="text-base sm:text-2xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 p-1.5 sm:p-2 rounded-lg transition">🛵</div>
+                    <div>
+                        <div class="text-[9px] sm:text-[11px] text-slate-400 group-hover:text-amber-300 font-bold uppercase tracking-wider transition">Envíos Pendientes</div>
+                        <div id="kpiEnviosPendientes" class="text-xs sm:text-lg font-black text-amber-400">0</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contenido Principal -->
+        <main class="max-w-7xl mx-auto px-4 py-3 sm:py-4 w-full flex-grow mb-16 md:mb-4">
+
+            <!-- ======================================================== -->
+            <!-- SECCIÓN 1: PANTALLA PRINCIPAL / FORMULARIO NUEVA ORDEN   -->
+            <!-- ======================================================== -->
+            <section id="seccionNuevaOrden" class="space-y-4">
+                <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5 max-w-4xl mx-auto">
+                    
+                    <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
                         <span id="labelFormularioTitulo" class="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                             📝 Alta de Nueva Orden
                         </span>
                         <p class="text-[10px] sm:text-xs text-slate-400 mt-0.5">Completá los datos del cliente, productos y modo de entrega</p>
                     </div>
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <button type="button" onclick="cambiarSeccion('busqueda')" class="text-xs text-sky-400 hover:text-sky-300 font-semibold underline flex items-center gap-1">
-                            🔍 Ir a Búsqueda de Órdenes
-                        </button>
-                    </div>
-                </div>
 
-                <form id="ordenForm" onsubmit="guardarOrden(event)" class="space-y-4">
+                    <form id="ordenForm" onsubmit="guardarOrden(event)" class="space-y-4">
                     <input type="hidden" id="ordenId">
 
                     <!-- Fila 1: Fecha / Vendedor / Estado / Pago -->
@@ -285,19 +318,12 @@
             <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5">
                 
                 <!-- Encabezado de la Sección de Búsqueda -->
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-700/70 pb-3">
-                    <div>
-                        <h2 class="text-base sm:text-lg font-black text-white tracking-wide flex items-center gap-2">
-                            🔍 <span>Búsqueda de Órdenes y Pedidos</span>
-                            <span id="contadorOrdenesBusqueda" class="text-xs bg-slate-900 text-sky-400 px-2.5 py-0.5 rounded-full border border-slate-700 font-bold">0</span>
-                        </h2>
-                        <p class="text-[11px] text-slate-400 mt-0.5">Filtrá pedidos recientes por número, cliente, vendedor, fechas o estado de entrega</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="cambiarSeccion('nueva')" class="bg-sky-600 hover:bg-sky-500 text-white font-bold py-1.5 px-3 rounded-lg text-xs transition shadow flex items-center gap-1">
-                            ➕ Nueva Orden
-                        </button>
-                    </div>
+                <div class="border-b border-slate-700/70 pb-3">
+                    <h2 class="text-base sm:text-lg font-black text-white tracking-wide flex items-center gap-2">
+                        🔍 <span>Búsqueda de Órdenes y Pedidos</span>
+                        <span id="contadorOrdenesBusqueda" class="text-xs bg-slate-900 text-sky-400 px-2.5 py-0.5 rounded-full border border-slate-700 font-bold">0</span>
+                    </h2>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Filtrá pedidos recientes por número, cliente, vendedor, fechas o estado de entrega</p>
                 </div>
 
                 <!-- Panel de Filtros Multicriterio -->
@@ -365,6 +391,7 @@
         </section>
 
     </main>
+    </div>
 
     <!-- ======================================================== -->
     <!-- BARRA INFERIOR MÓVIL (BOTTOM NAVIGATION BAR)              -->

@@ -78,11 +78,19 @@ function configurarMarcaUI() {
     const panelTitle = document.getElementById('panelUltimosTitle');
     const agregarLabel = document.getElementById('agregarProdLabel');
 
+    const logoImgMob = document.getElementById('brandLogoMobile');
+    const titleMob = document.getElementById('brandTitleMobile');
+
     if (esIncanto) {
         if (logoImg) logoImg.src = '/logos/incanto.png';
+        if (logoImgMob) logoImgMob.src = '/logos/incanto.png';
         if (title) {
             title.textContent = 'INCANTO';
-            title.className = 'text-base sm:text-2xl font-black tracking-wider text-rose-500 leading-none';
+            title.className = 'text-xl font-black tracking-wider text-rose-500 leading-tight truncate';
+        }
+        if (titleMob) {
+            titleMob.textContent = 'INCANTO';
+            titleMob.className = 'md:hidden text-base font-black tracking-wider text-rose-500 leading-none';
         }
         if (submitBtn) submitBtn.className = 'flex-1 sm:flex-none bg-rose-600 hover:bg-rose-500 font-bold py-2.5 px-6 rounded-lg text-white shadow-lg transition text-center text-xs';
         if (buscarBtn) buscarBtn.className = 'bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition shadow';
@@ -90,9 +98,14 @@ function configurarMarcaUI() {
         if (agregarLabel) agregarLabel.className = 'block text-xs font-semibold text-rose-400 uppercase tracking-wider';
     } else {
         if (logoImg) logoImg.src = '/logos/panatech.png';
+        if (logoImgMob) logoImgMob.src = '/logos/panatech.png';
         if (title) {
             title.textContent = 'PANATECH';
-            title.className = 'text-base sm:text-2xl font-black tracking-wider text-sky-400 leading-none';
+            title.className = 'text-xl font-black tracking-wider text-sky-400 leading-tight truncate';
+        }
+        if (titleMob) {
+            titleMob.textContent = 'PANATECH';
+            titleMob.className = 'md:hidden text-base font-black tracking-wider text-sky-400 leading-none';
         }
     }
 
@@ -600,8 +613,8 @@ function cambiarSeccion(seccion) {
     const secNueva = document.getElementById('seccionNuevaOrden');
     const secBusqueda = document.getElementById('seccionBusquedaOrdenes');
 
-    const tabNueva = document.getElementById('tabNavNueva');
-    const tabBusqueda = document.getElementById('tabNavBusqueda');
+    const sideNueva = document.getElementById('sideNavNueva');
+    const sideBusqueda = document.getElementById('sideNavBusqueda');
 
     const bNavNueva = document.getElementById('bottomNavNueva');
     const bNavBusqueda = document.getElementById('bottomNavBusqueda');
@@ -614,12 +627,12 @@ function cambiarSeccion(seccion) {
         if (secNueva) secNueva.classList.remove('hidden');
         if (secBusqueda) secBusqueda.classList.add('hidden');
 
-        // Pestañas Desktop
-        if (tabNueva) {
-            tabNueva.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${bgActivo} text-white shadow`;
+        // Menú Lateral Desktop
+        if (sideNueva) {
+            sideNueva.className = `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg`;
         }
-        if (tabBusqueda) {
-            tabBusqueda.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition";
+        if (sideBusqueda) {
+            sideBusqueda.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
         }
 
         // Barra Móvil
@@ -635,12 +648,12 @@ function cambiarSeccion(seccion) {
         if (secNueva) secNueva.classList.add('hidden');
         if (secBusqueda) secBusqueda.classList.remove('hidden');
 
-        // Pestañas Desktop
-        if (tabNueva) {
-            tabNueva.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition";
+        // Menú Lateral Desktop
+        if (sideNueva) {
+            sideNueva.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
         }
-        if (tabBusqueda) {
-            tabBusqueda.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${bgActivo} text-white shadow`;
+        if (sideBusqueda) {
+            sideBusqueda.className = `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg`;
         }
 
         // Barra Móvil
