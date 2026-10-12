@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="300" rx="16" fill="url(#bg)"/>
+  <rect x="4" y="4" width="292" height="292" rx="12" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="6 4"/>
+  <g transform="translate(150, 120)" text-anchor="middle">
+    <rect x="-45" y="-35" width="90" height="70" rx="10" fill="#334155" opacity="0.6"/>
+    <circle cx="-15" cy="-10" r="12" fill="#64748b"/>
+    <path d="M-35 25 L5 -15 L25 5 L15 -5 L35 25 Z" fill="#475569"/>
+    <line x1="-50" y1="40" x2="50" y2="-40" stroke="#f43f5e" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+  </g>
+  <text x="150" y="200" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700" text-anchor="middle" letter-spacing="0.5">
+    IMAGEN NO DISPONIBLE
+  </text>
+  <text x="150" y="222" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">
+    Producto del sistema
+  </text>
+</svg>

@@ -5,6 +5,7 @@ const path = require('path');
 const { generarReporteVentasAvanzado } = require('./excelService');
 const { generarHTMLPresentacion } = require('./reportePresentacionService');
 const { generarHTMLReporteMayorista } = require('./reporteMayoristaService');
+const { sincronizarProductosPanatech, obtenerMetadataPanatech } = require('./panatechScraperService');
 
 const app = express();
 app.use(express.json());
@@ -328,6 +329,119 @@ app.get('/api/metricas/hoy', async (req, res) => {
     }
 });
 
+// API Catálogo Completo de Productos (con imágenes, filtros y stock)
+app.get('/api/productos/catalogo', async (req, res) => {
+    const { q, marca, stock_filter, sort } = req.query;
+    const marcaTarget = (marca || 'panatech').toLowerCase();
+
+    try {
+        let query = supabase
+            .from('productos')
+            .select('*')
+            .eq('marca', marcaTarget);
+
+        if (q && q.trim().length > 0) {
+            const termino = q.trim();
+            query = query.or(`nombre.ilike.%${termino}%,codigo_sku.ilike.%${termino}%,variante.ilike.%${termino}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        let items = data || [];
+
+        // Enriquecer con metadatos si es Panatech
+        let metadata = {};
+        if (marcaTarget === 'panatech') {
+            metadata = await obtenerMetadataPanatech(supabase);
+        }
+
+        let productosEnriquecidos = items.map(p => {
+            const meta = metadata[p.id] || null;
+            return {
+                ...p,
+                imagen_url: meta && meta.imagen_url ? meta.imagen_url : '/img/no-image.svg',
+                url_tienda: meta ? meta.url_tienda : null,
+                precio_lista: meta ? (meta.precio_lista || p.precio) : p.precio,
+                precio_efectivo: p.precio,
+                synced_web: !!(meta && meta.synced_web),
+                es_duplicado: !!(meta && meta.es_duplicado)
+            };
+        });
+
+        // Unificar productos por nombre para evitar duplicados en la vista
+        const unificadosMap = new Map();
+        for (const p of productosEnriquecidos) {
+            const norm = (p.nombre || '').toLowerCase().trim();
+            if (!unificadosMap.has(norm)) {
+                unificadosMap.set(norm, p);
+            } else {
+                const existente = unificadosMap.get(norm);
+                // Si el nuevo tiene stock > 0 y el existente no, preferir el que tiene stock
+                if (p.stock > existente.stock) {
+                    unificadosMap.set(norm, p);
+                }
+            }
+        }
+        productosEnriquecidos = Array.from(unificadosMap.values());
+
+        // Filtrado por stock
+        if (stock_filter === 'con_stock') {
+            productosEnriquecidos = productosEnriquecidos.filter(p => p.stock > 0);
+        } else if (stock_filter === 'sin_stock') {
+            productosEnriquecidos = productosEnriquecidos.filter(p => p.stock === 0);
+        } else if (stock_filter === 'web') {
+            productosEnriquecidos = productosEnriquecidos.filter(p => p.synced_web);
+        } else if (stock_filter === 'manual') {
+            productosEnriquecidos = productosEnriquecidos.filter(p => !p.synced_web);
+        }
+
+        // Ordenamiento
+        if (sort === 'precio_asc') {
+            productosEnriquecidos.sort((a, b) => a.precio - b.precio);
+        } else if (sort === 'precio_desc') {
+            productosEnriquecidos.sort((a, b) => b.precio - a.precio);
+        } else if (sort === 'stock_desc') {
+            productosEnriquecidos.sort((a, b) => b.stock - a.stock);
+        } else if (sort === 'stock_asc') {
+            productosEnriquecidos.sort((a, b) => a.stock - b.stock);
+        } else {
+            // Nombre A-Z por defecto
+            productosEnriquecidos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+        }
+
+        res.json({
+            success: true,
+            productos: productosEnriquecidos,
+            total: productosEnriquecidos.length,
+            syncInfo: metadata._info || null
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// API Sincronizar catálogo de Panatech desde la tienda online
+app.post('/api/panatech/sync-web', async (req, res) => {
+    try {
+        const resultado = await sincronizarProductosPanatech(supabase);
+        res.json(resultado);
+    } catch (err) {
+        console.error('Error al sincronizar Panatech con web:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// API Info de última sincronización
+app.get('/api/panatech/sync-info', async (req, res) => {
+    try {
+        const metadata = await obtenerMetadataPanatech(supabase);
+        res.json({ success: true, info: metadata._info || null });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // API Buscar Productos (Optimizada con filtro DB y stock)
 app.get('/api/productos/buscar', async (req, res) => {
     const { q, marca } = req.query;
@@ -347,7 +461,17 @@ app.get('/api/productos/buscar', async (req, res) => {
         const { data, error } = await query.order('nombre', { ascending: true }).limit(20);
 
         if (error) throw error;
-        res.json(data || []);
+
+        let items = data || [];
+        if (marcaTarget === 'panatech') {
+            const metadata = await obtenerMetadataPanatech(supabase);
+            items = items.map(p => ({
+                ...p,
+                imagen_url: metadata[p.id]?.imagen_url || '/img/no-image.svg'
+            }));
+        }
+
+        res.json(items);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

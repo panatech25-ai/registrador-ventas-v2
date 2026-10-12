@@ -1189,116 +1189,424 @@ function abrirPresentacionEnPantalla() {
 }
 
 // ==========================================
-// MODAL STOCK Y PRECIOS
+// CATÁLOGO, STOCK Y PRECIOS CON IMÁGENES Y FILTROS
 // ==========================================
-function abrirModalStock() { document.getElementById('modalStock').classList.remove('hidden'); }
-function cerrarModalStock() { document.getElementById('modalStock').classList.add('hidden'); }
+let CATALOGO_PRODUCTOS = [];
+let CATALOGO_FILTRO_STOCK = 'todos'; // 'todos' | 'con_stock' | 'sin_stock' | 'web' | 'manual'
+let CATALOGO_BUSQUEDA = '';
+let CATALOGO_ORDEN = 'nombre_asc';
+let CATALOGO_CARGANDO = false;
 
-const onBuscarStockInput = debounce((val) => buscarParaCambiarStock(val), 250);
+function abrirModalStock() {
+    const modal = document.getElementById('modalStock');
+    if (!modal) return;
+    modal.classList.remove('hidden');
 
-async function buscarParaCambiarStock(q) {
-    const container = document.getElementById('resultadosCambioStock');
-    if (!q || q.trim().length === 0) {
-        container.classList.add('hidden');
+    const badgeMarca = document.getElementById('badgeMarcaStock');
+    const subtitulo = document.getElementById('subtituloStock');
+    const btnSync = document.getElementById('btnSyncWebPanatech');
+    const pillWeb = document.getElementById('pillFiltroWeb');
+    const pillManual = document.getElementById('pillFiltroManual');
+
+    const esPanatech = MARCA_ACTUAL === 'panatech';
+    if (badgeMarca) {
+        badgeMarca.textContent = esPanatech ? 'Panatech' : 'Incanto';
+        badgeMarca.className = esPanatech
+            ? 'text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800'
+            : 'text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-800';
+    }
+
+    if (subtitulo) {
+        subtitulo.innerHTML = esPanatech
+            ? 'Precios en <span class="text-emerald-400 font-semibold">Efectivo o Transferencia</span> sincronizados con la tienda oficial'
+            : 'Gestión de precios y control de inventario de Incanto';
+    }
+
+    if (btnSync) btnSync.style.display = esPanatech ? 'flex' : 'none';
+    if (pillWeb) pillWeb.style.display = esPanatech ? 'inline-block' : 'none';
+    if (pillManual) pillManual.style.display = esPanatech ? 'inline-block' : 'none';
+
+    // Cargar productos
+    cargarCatalogoProductos();
+}
+
+function cerrarModalStock() {
+    const modal = document.getElementById('modalStock');
+    if (modal) modal.classList.add('hidden');
+    cerrarModalEditarRapido();
+}
+
+async function cargarCatalogoProductos() {
+    if (CATALOGO_CARGANDO) return;
+    CATALOGO_CARGANDO = true;
+
+    const grid = document.getElementById('listaProductosStockGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="col-span-full py-16 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                <div class="animate-spin text-3xl text-amber-500">⏳</div>
+                <p class="text-xs font-semibold">Cargando catálogo de productos y stock...</p>
+            </div>
+        `;
+    }
+
+    try {
+        const res = await fetch(`/api/productos/catalogo?marca=${MARCA_ACTUAL}&sort=${CATALOGO_ORDEN}`);
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.productos)) {
+            CATALOGO_PRODUCTOS = data.productos;
+            actualizarContadoresStockPills(CATALOGO_PRODUCTOS);
+            renderizarCatalogoFiltrado();
+
+            // Info de sincronización
+            const infoSync = document.getElementById('infoUltimaSyncHeader');
+            if (infoSync) {
+                if (MARCA_ACTUAL === 'panatech' && data.syncInfo && data.syncInfo.ultima_sincronizacion) {
+                    const fecha = new Date(data.syncInfo.ultima_sincronizacion);
+                    const fechaTxt = fecha.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+                    infoSync.innerHTML = `Última sincronización web: <span class="text-sky-400 font-semibold">${fechaTxt}</span> (${data.syncInfo.total_web || 0} en tienda)`;
+                } else {
+                    infoSync.textContent = '';
+                }
+            }
+        } else {
+            if (grid) {
+                grid.innerHTML = `<div class="col-span-full py-12 text-center text-xs text-rose-400">Error al cargar productos.</div>`;
+            }
+        }
+    } catch (err) {
+        console.error('Error al cargar catálogo:', err);
+        if (grid) {
+            grid.innerHTML = `<div class="col-span-full py-12 text-center text-xs text-rose-400">Error de conexión al cargar catálogo.</div>`;
+        }
+    } finally {
+        CATALOGO_CARGANDO = false;
+    }
+}
+
+function actualizarContadoresStockPills(productos) {
+    const countTodos = document.getElementById('countTodos');
+    const countConStock = document.getElementById('countConStock');
+    const countSinStock = document.getElementById('countSinStock');
+    const countWeb = document.getElementById('countWeb');
+    const countManual = document.getElementById('countManual');
+
+    const total = productos.length;
+    const conStock = productos.filter(p => p.stock > 0).length;
+    const sinStock = productos.filter(p => p.stock === 0).length;
+    const web = productos.filter(p => p.synced_web).length;
+    const manual = productos.filter(p => !p.synced_web).length;
+
+    if (countTodos) countTodos.textContent = total;
+    if (countConStock) countConStock.textContent = conStock;
+    if (countSinStock) countSinStock.textContent = sinStock;
+    if (countWeb) countWeb.textContent = web;
+    if (countManual) countManual.textContent = manual;
+}
+
+const onInputBusquedaCatalogo = debounce((valor) => {
+    CATALOGO_BUSQUEDA = (valor || '').trim().toLowerCase();
+    const btnLimpiar = document.getElementById('btnLimpiarBuscarCat');
+    if (btnLimpiar) {
+        if (CATALOGO_BUSQUEDA) btnLimpiar.classList.remove('hidden');
+        else btnLimpiar.classList.add('hidden');
+    }
+    renderizarCatalogoFiltrado();
+}, 200);
+
+function limpiarBusquedaCatalogo() {
+    const input = document.getElementById('catalogoBuscarInput');
+    if (input) input.value = '';
+    CATALOGO_BUSQUEDA = '';
+    const btnLimpiar = document.getElementById('btnLimpiarBuscarCat');
+    if (btnLimpiar) btnLimpiar.classList.add('hidden');
+    renderizarCatalogoFiltrado();
+}
+
+function cambiarOrdenCatalogo(nuevoOrden) {
+    CATALOGO_ORDEN = nuevoOrden;
+    if (CATALOGO_ORDEN === 'precio_asc') {
+        CATALOGO_PRODUCTOS.sort((a, b) => a.precio - b.precio);
+    } else if (CATALOGO_ORDEN === 'precio_desc') {
+        CATALOGO_PRODUCTOS.sort((a, b) => b.precio - a.precio);
+    } else if (CATALOGO_ORDEN === 'stock_desc') {
+        CATALOGO_PRODUCTOS.sort((a, b) => b.stock - a.stock);
+    } else if (CATALOGO_ORDEN === 'stock_asc') {
+        CATALOGO_PRODUCTOS.sort((a, b) => a.stock - b.stock);
+    } else {
+        CATALOGO_PRODUCTOS.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+    }
+    renderizarCatalogoFiltrado();
+}
+
+function setFiltroStock(filtro) {
+    CATALOGO_FILTRO_STOCK = filtro;
+
+    const botones = document.querySelectorAll('.filtro-stock-btn');
+    botones.forEach(btn => {
+        const f = btn.getAttribute('data-filter');
+        if (f === filtro) {
+            btn.className = 'filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 shadow transition';
+        } else {
+            btn.className = 'filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition';
+        }
+    });
+
+    renderizarCatalogoFiltrado();
+}
+
+function renderizarCatalogoFiltrado() {
+    const grid = document.getElementById('listaProductosStockGrid');
+    const resumen = document.getElementById('resumenContadorProductos');
+    if (!grid) return;
+
+    let filtrados = CATALOGO_PRODUCTOS;
+
+    if (CATALOGO_BUSQUEDA) {
+        filtrados = filtrados.filter(p => {
+            const nom = (p.nombre || '').toLowerCase();
+            const sku = (p.codigo_sku || '').toLowerCase();
+            const var_ = (p.variante || '').toLowerCase();
+            return nom.includes(CATALOGO_BUSQUEDA) || sku.includes(CATALOGO_BUSQUEDA) || var_.includes(CATALOGO_BUSQUEDA);
+        });
+    }
+
+    if (CATALOGO_FILTRO_STOCK === 'con_stock') {
+        filtrados = filtrados.filter(p => p.stock > 0);
+    } else if (CATALOGO_FILTRO_STOCK === 'sin_stock') {
+        filtrados = filtrados.filter(p => p.stock === 0);
+    } else if (CATALOGO_FILTRO_STOCK === 'web') {
+        filtrados = filtrados.filter(p => p.synced_web);
+    } else if (CATALOGO_FILTRO_STOCK === 'manual') {
+        filtrados = filtrados.filter(p => !p.synced_web);
+    }
+
+    if (resumen) {
+        const conS = filtrados.filter(p => p.stock > 0).length;
+        const sinS = filtrados.filter(p => p.stock === 0).length;
+        resumen.textContent = `Mostrando ${filtrados.length} productos (${conS} con stock, ${sinS} sin stock)`;
+    }
+
+    if (filtrados.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full py-16 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                <div class="text-4xl">🔍</div>
+                <p class="text-xs font-bold text-white">No se encontraron productos con los filtros seleccionados</p>
+                <button type="button" onclick="setFiltroStock('todos'); limpiarBusquedaCatalogo();" class="text-xs text-amber-400 hover:underline">
+                    Restablecer filtros y ver todos
+                </button>
+            </div>
+        `;
         return;
     }
 
-    const res = await fetch(`/api/productos/buscar?q=${encodeURIComponent(q)}&marca=${MARCA_ACTUAL}`);
-    const productos = await res.json();
+    grid.innerHTML = filtrados.map(p => {
+        const tieneStock = p.stock > 0;
+        const badgeStock = tieneStock
+            ? `<span class="bg-emerald-950/90 text-emerald-400 border border-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">🟢 ${p.stock} u.</span>`
+            : `<span class="bg-rose-950/90 text-rose-400 border border-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">🔴 Sin stock</span>`;
 
-    if (!productos || productos.length === 0) {
-        container.innerHTML = '<div class="p-2 text-xs text-slate-400 text-center">Sin resultados</div>';
-    } else {
-        container.innerHTML = productos.map(p => `
-            <div onclick="seleccionarProdParaStock(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-2 hover:bg-slate-800 cursor-pointer border-b border-slate-800 text-xs text-white flex justify-between items-center">
-                <div>
-                    <b>${p.nombre}</b> - ${p.variante || 'N/A'}
+        const badgeOrigen = p.synced_web
+            ? `<span class="bg-sky-950/90 text-sky-400 border border-sky-800/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">🌐 Web</span>`
+            : `<span class="bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-md">📁 Sistema</span>`;
+
+        const precioFormateado = (p.precio || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        const precioListaFormateado = (p.precio_lista && p.precio_lista > p.precio)
+            ? `<span class="text-[10px] text-slate-500 line-through">$${p.precio_lista.toLocaleString('es-AR')} lista</span>`
+            : '';
+
+        const jsonProd = JSON.stringify(p).replace(/"/g, '&quot;');
+
+        return `
+            <div class="bg-slate-850 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-3 flex flex-col justify-between transition group shadow-lg">
+                <!-- Imagen y Badges -->
+                <div class="relative bg-slate-950 rounded-xl overflow-hidden mb-2.5 border border-slate-800 flex items-center justify-center h-40">
+                    <img src="${p.imagen_url || '/img/no-image.svg'}" 
+                         alt="${p.nombre}" 
+                         loading="lazy"
+                         onerror="this.onerror=null; this.src='/img/no-image.svg';" 
+                         class="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-300">
+                    
+                    <div class="absolute top-2 left-2 flex items-center gap-1">
+                        ${badgeOrigen}
+                    </div>
+
+                    <div class="absolute top-2 right-2">
+                        ${badgeStock}
+                    </div>
+
+                    ${p.url_tienda ? `
+                        <a href="${p.url_tienda}" target="_blank" rel="noopener noreferrer" title="Ver en tienda online" class="absolute bottom-2 right-2 bg-slate-900/90 hover:bg-sky-600 text-slate-300 hover:text-white p-1.5 rounded-lg border border-slate-700 transition">
+                            <span class="text-xs">🔗</span>
+                        </a>
+                    ` : ''}
                 </div>
-                <div class="text-right">
-                    <span class="text-emerald-400 font-bold">$${p.precio}</span>
-                    <span class="text-slate-400 text-[10px] block">Stock: ${p.stock}</span>
+
+                <!-- Info -->
+                <div class="space-y-1.5 flex-1 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                            <span>${p.codigo_sku || 'S/N'}</span>
+                            <span class="truncate ml-1 max-w-[120px]">${p.variante && p.variante !== 'Única' ? p.variante : ''}</span>
+                        </div>
+                        <h4 class="text-xs font-bold text-white line-clamp-2 mt-0.5 leading-snug group-hover:text-amber-400 transition" title="${p.nombre}">
+                            ${p.nombre}
+                        </h4>
+                    </div>
+
+                    <!-- Precios -->
+                    <div class="pt-2 border-t border-slate-800/80 flex items-baseline justify-between">
+                        <div>
+                            <span class="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider">Efectivo / Transf.</span>
+                            <span class="text-sm font-extrabold text-emerald-400">
+                                $${precioFormateado}
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            ${precioListaFormateado}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón de Acción -->
+                <div class="pt-2 mt-2 border-t border-slate-800">
+                    <button type="button" onclick="abrirModalEditarRapido(${jsonProd})" class="w-full bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-200 text-xs font-bold py-1.5 px-3 rounded-xl border border-slate-700 hover:border-amber-500 transition flex items-center justify-center gap-1.5 shadow active:scale-95">
+                        <span>✏️</span>
+                        <span>Editar Precio / Stock</span>
+                    </button>
                 </div>
             </div>
-        `).join('');
+        `;
+    }).join('');
+}
+
+// Sincronización Web con la tienda online panatech.com.ar
+async function ejecutarSincronizacionWebPanatech() {
+    const btn = document.getElementById('btnSyncWebPanatech');
+    const icon = document.getElementById('iconSyncWeb');
+    const text = document.getElementById('textSyncWeb');
+
+    if (btn) btn.disabled = true;
+    if (icon) icon.className = 'inline-block animate-spin';
+    if (text) text.textContent = 'Sincronizando Tienda...';
+
+    showToast('Iniciando lectura y unificación de productos desde panatech.com.ar...', 'info');
+
+    try {
+        const res = await fetch('/api/panatech/sync-web', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(`¡Sincronización exitosa! ${data.totalWeb} productos en web: ${data.actualizados} actualizados, ${data.nuevos} nuevos.`, 'success');
+            await cargarCatalogoProductos();
+        } else {
+            showToast('Error en sincronización: ' + (data.error || ''), 'error');
+        }
+    } catch (err) {
+        console.error('Error al sincronizar:', err);
+        showToast('Error de conexión al sincronizar la tienda online.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+        if (icon) icon.className = '';
+        if (text) text.textContent = 'Sincronizar Tienda Online';
     }
-    container.classList.remove('hidden');
 }
 
-function seleccionarProdParaStock(p) {
-    document.getElementById('editStockProdId').value = p.id;
-    document.getElementById('editProdNombre').value = p.nombre || '';
-    document.getElementById('editStockProdVariante').textContent = `Variante: ${p.variante || 'N/A'}`;
-    document.getElementById('editProdPrecio').value = p.precio;
-    document.getElementById('editProdStock').value = p.stock;
+// Modal Edición Rápida de Producto
+function abrirModalEditarRapido(prod) {
+    if (!prod) return;
+    document.getElementById('editRapidoId').value = prod.id;
+    document.getElementById('editRapidoNombre').value = prod.nombre || '';
+    document.getElementById('editRapidoPrecio').value = prod.precio || 0;
+    document.getElementById('editRapidoStock').value = prod.stock || 0;
 
-    document.getElementById('resultadosCambioStock').classList.add('hidden');
-    document.getElementById('detalleProdEditarStock').classList.remove('hidden');
+    document.getElementById('editRapidoSku').textContent = prod.codigo_sku || 'S/N';
+    document.getElementById('editRapidoTituloPreview').textContent = prod.nombre || '';
 
-    const btn = document.getElementById('btnGuardarStock');
-    btn.disabled = false;
-    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    const img = document.getElementById('editRapidoImg');
+    if (img) img.src = prod.imagen_url || '/img/no-image.svg';
 
-    const btnEliminar = document.getElementById('btnEliminarProdStock');
-    if (btnEliminar) btnEliminar.classList.remove('hidden');
+    const badgeWeb = document.getElementById('editRapidoBadgeWeb');
+    if (badgeWeb) {
+        badgeWeb.textContent = prod.synced_web ? '🌐 Vinculado a Tienda Web' : '📁 Producto del Sistema';
+    }
+
+    const modal = document.getElementById('modalEditarProdRapido');
+    if (modal) modal.classList.remove('hidden');
 }
 
-function volverAtrasStock() {
-    document.getElementById('detalleProdEditarStock').classList.add('hidden');
-    document.getElementById('buscarStockInput').value = '';
-    const btn = document.getElementById('btnGuardarStock');
-    btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
-
-    const btnEliminar = document.getElementById('btnEliminarProdStock');
-    if (btnEliminar) btnEliminar.classList.add('hidden');
+function cerrarModalEditarRapido() {
+    const modal = document.getElementById('modalEditarProdRapido');
+    if (modal) modal.classList.add('hidden');
 }
 
-async function guardarNuevoStockCat() {
-    const id = document.getElementById('editStockProdId').value;
-    const nombre = document.getElementById('editProdNombre').value;
-    const precio = document.getElementById('editProdPrecio').value;
-    const stock = document.getElementById('editProdStock').value;
+async function guardarEdicionRapidaProducto(e) {
+    if (e) e.preventDefault();
+
+    const id = document.getElementById('editRapidoId').value;
+    const nombre = document.getElementById('editRapidoNombre').value;
+    const precio = document.getElementById('editRapidoPrecio').value;
+    const stock = document.getElementById('editRapidoStock').value;
 
     if (!nombre || nombre.trim() === '') {
         showToast('El nombre del producto no puede estar vacío.', 'warning');
         return;
     }
 
-    const res = await fetch(`/api/productos/${id}/stock`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, precio, stock })
-    });
+    try {
+        const res = await fetch(`/api/productos/${id}/stock`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre, precio, stock })
+        });
+        const data = await res.json();
 
-    const data = await res.json();
-    if (data.success) {
-        showToast('Producto y stock actualizados correctamente.', 'success');
-        volverAtrasStock();
-        cerrarModalStock();
-    } else {
-        showToast('Error al actualizar el producto.', 'error');
+        if (data.success) {
+            showToast('Producto y stock actualizados correctamente.', 'success');
+            
+            // Actualizar localmente en memoria
+            const idx = CATALOGO_PRODUCTOS.findIndex(p => String(p.id) === String(id));
+            if (idx !== -1) {
+                CATALOGO_PRODUCTOS[idx].nombre = nombre;
+                CATALOGO_PRODUCTOS[idx].precio = parseFloat(precio);
+                CATALOGO_PRODUCTOS[idx].precio_efectivo = parseFloat(precio);
+                CATALOGO_PRODUCTOS[idx].stock = parseInt(stock, 10);
+                actualizarContadoresStockPills(CATALOGO_PRODUCTOS);
+                renderizarCatalogoFiltrado();
+            }
+
+            cerrarModalEditarRapido();
+        } else {
+            showToast('Error al actualizar el producto: ' + (data.error || ''), 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión al actualizar.', 'error');
     }
 }
 
-async function eliminarProductoStock() {
-    const id = document.getElementById('editStockProdId').value;
-    const nombre = document.getElementById('editProdNombre').value;
+async function eliminarProductoDesdeModalRapido() {
+    const id = document.getElementById('editRapidoId').value;
+    const nombre = document.getElementById('editRapidoNombre').value;
 
     if (!id) return;
-
     if (!confirm(`¿Estás seguro de que deseas eliminar el producto "${nombre}" del catálogo?`)) {
         return;
     }
 
     try {
-        const res = await fetch(`/api/productos/${id}`, {
-            method: 'DELETE'
-        });
+        const res = await fetch(`/api/productos/${id}`, { method: 'DELETE' });
         const data = await res.json();
+
         if (data.success) {
             showToast(data.mensaje || 'Producto eliminado.', data.esReferenciado ? 'warning' : 'success');
-            volverAtrasStock();
-            cerrarModalStock();
+            CATALOGO_PRODUCTOS = CATALOGO_PRODUCTOS.filter(p => String(p.id) !== String(id));
+            actualizarContadoresStockPills(CATALOGO_PRODUCTOS);
+            renderizarCatalogoFiltrado();
+            cerrarModalEditarRapido();
         } else {
             showToast('Error al eliminar: ' + (data.error || ''), 'error');
         }

@@ -812,53 +812,161 @@
         </div>
     </div>
 
-    <!-- Modal Stock y Precios -->
-    <div id="modalStock" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-        <div class="bg-slate-800 border border-slate-700 p-4 sm:p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
-                <h3 class="text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider">Actualizar Producto, Precio y Stock</h3>
-                <button onclick="cerrarModalStock()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
-            </div>
-
-            <div class="relative">
-                <input type="text" id="buscarStockInput" onkeyup="onBuscarStockInput(this.value)" placeholder="Buscar producto en catálogo..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none">
-                <div id="resultadosCambioStock" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-48 overflow-y-auto"></div>
-            </div>
-
-            <!-- Editor de Stock y Nombre -->
-            <div id="detalleProdEditarStock" class="hidden bg-slate-900/80 p-3 sm:p-4 rounded-xl border border-slate-700/80 space-y-3">
-                <input type="hidden" id="editStockProdId">
-                <div>
-                    <label class="block text-[10px] text-slate-400 mb-1">Nombre del Producto</label>
-                    <input type="text" id="editProdNombre" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
+    <!-- Modal Catálogo, Stock y Precios (Modernizado con fotos, filtros y sincronización web) -->
+    <div id="modalStock" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-6xl w-full h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <!-- HEADER -->
+            <div class="bg-slate-800/90 px-4 sm:px-6 py-3.5 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xl text-amber-400">
+                        📦
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Stock y Catálogo de Precios</h3>
+                            <span id="badgeMarcaStock" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800">Panatech</span>
+                        </div>
+                        <p id="subtituloStock" class="text-[11px] text-slate-400">
+                            Precios en <span class="text-emerald-400 font-semibold">Efectivo o Transferencia</span> y control de inventario
+                        </p>
+                    </div>
                 </div>
-                <div id="editStockProdVariante" class="text-[10px] text-slate-400 font-semibold"></div>
+
+                <div class="flex items-center gap-2">
+                    <!-- Botón Sincronizar Web (Exclusivo Panatech) -->
+                    <button id="btnSyncWebPanatech" type="button" onclick="ejecutarSincronizacionWebPanatech()" class="bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95">
+                        <span id="iconSyncWeb">🔄</span>
+                        <span id="textSyncWeb">Sincronizar Tienda Online</span>
+                    </button>
+
+                    <!-- Botón Agregar Producto Manual -->
+                    <button type="button" onclick="abrirModalManual()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center gap-1.5">
+                        <span>➕</span>
+                        <span class="hidden sm:inline">Nuevo Producto</span>
+                    </button>
+
+                    <!-- Botón Cerrar -->
+                    <button type="button" onclick="cerrarModalStock()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm transition">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- BARRA DE BÚSQUEDA Y FILTROS -->
+            <div class="bg-slate-850 px-4 sm:px-6 py-3 border-b border-slate-800 space-y-2.5 shrink-0">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                    <!-- Input de búsqueda -->
+                    <div class="relative flex-1">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+                        <input type="text" id="catalogoBuscarInput" oninput="onInputBusquedaCatalogo(this.value)" placeholder="Buscar por nombre, SKU o palabra clave..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-8 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
+                        <button type="button" id="btnLimpiarBuscarCat" onclick="limpiarBusquedaCatalogo()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-bold">✕</button>
+                    </div>
+
+                    <!-- Ordenamiento -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-[11px] text-slate-400 font-semibold whitespace-nowrap hidden sm:inline">Ordenar:</label>
+                        <select id="catalogoOrdenSelect" onchange="cambiarOrdenCatalogo(this.value)" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                            <option value="nombre_asc">Nombre (A - Z)</option>
+                            <option value="stock_desc">Mayor Stock</option>
+                            <option value="stock_asc">Menor Stock</option>
+                            <option value="precio_desc">Mayor Precio</option>
+                            <option value="precio_asc">Menor Precio</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Chips / Filtros rápidos -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <div class="flex flex-wrap items-center gap-1.5" id="filtrosStockPills">
+                        <button type="button" onclick="setFiltroStock('todos')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 shadow transition" data-filter="todos">
+                            Todos (<span id="countTodos">0</span>)
+                        </button>
+                        <button type="button" onclick="setFiltroStock('con_stock')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="con_stock">
+                            🟢 Con Stock (<span id="countConStock">0</span>)
+                        </button>
+                        <button type="button" onclick="setFiltroStock('sin_stock')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="sin_stock">
+                            🔴 Sin Stock (<span id="countSinStock">0</span>)
+                        </button>
+                        <button type="button" id="pillFiltroWeb" onclick="setFiltroStock('web')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="web">
+                            🌐 Tienda Web (<span id="countWeb">0</span>)
+                        </button>
+                        <button type="button" id="pillFiltroManual" onclick="setFiltroStock('manual')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="manual">
+                            📁 Solo Sistema (<span id="countManual">0</span>)
+                        </button>
+                    </div>
+
+                    <div id="infoUltimaSyncHeader" class="text-[11px] text-slate-400 italic"></div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR DE PRODUCTOS (GRID CON SCROLL) -->
+            <div id="contenedorGridProductos" class="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-900/60">
+                <div id="listaProductosStockGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <!-- Tarjetas de productos renderizadas dinámicamente -->
+                </div>
+            </div>
+
+            <!-- FOOTER RESUMEN -->
+            <div class="bg-slate-800/90 px-4 sm:px-6 py-2.5 border-t border-slate-700/80 flex flex-wrap justify-between items-center text-xs text-slate-400 shrink-0">
+                <span id="resumenContadorProductos">Cargando catálogo...</span>
+                <span class="text-[11px] text-slate-400 hidden sm:inline">💡 Clic en <b class="text-amber-400">"Editar"</b> en cualquier tarjeta para ajustar precio o stock</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Popup Edición Rápida de Producto -->
+    <div id="modalEditarProdRapido" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-60 flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-slate-800 border border-slate-700 p-4 sm:p-5 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-amber-400 font-bold">✏️</span>
+                    <h4 class="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">Editar Producto y Stock</h4>
+                </div>
+                <button type="button" onclick="cerrarModalEditarRapido()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
+            </div>
+
+            <!-- Vista previa del producto -->
+            <div class="flex gap-3 bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 items-center">
+                <img id="editRapidoImg" src="/img/no-image.svg" class="w-16 h-16 rounded-lg object-contain bg-slate-950 border border-slate-800 shrink-0" onerror="this.src='/img/no-image.svg'">
+                <div class="flex-1 min-w-0 flex flex-col justify-center">
+                    <span id="editRapidoSku" class="text-[10px] text-slate-400 font-mono"></span>
+                    <span id="editRapidoTituloPreview" class="text-xs font-bold text-white truncate"></span>
+                    <span id="editRapidoBadgeWeb" class="text-[10px] text-sky-400 font-semibold mt-0.5"></span>
+                </div>
+            </div>
+
+            <form id="formEditarProdRapido" onsubmit="guardarEdicionRapidaProducto(event)" class="space-y-3">
+                <input type="hidden" id="editRapidoId">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-300 uppercase mb-1">Nombre del Producto *</label>
+                    <input type="text" id="editRapidoNombre" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-[10px] text-slate-400 mb-1">Precio ($)</label>
-                        <input type="number" step="0.01" id="editProdPrecio" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
+                        <label class="block text-[10px] font-bold text-slate-300 uppercase mb-1">Precio ($) Efectivo *</label>
+                        <input type="number" step="0.01" id="editRapidoPrecio" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-500">
+                        <span class="text-[9px] text-slate-400 block mt-0.5">Efectivo / Transferencia</span>
                     </div>
                     <div>
-                        <label class="block text-[10px] text-slate-400 mb-1">Stock</label>
-                        <input type="number" id="editProdStock" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none">
+                        <label class="block text-[10px] font-bold text-slate-300 uppercase mb-1">Stock Disponible *</label>
+                        <input type="number" id="editRapidoStock" required min="0" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-500">
+                        <span class="text-[9px] text-slate-400 block mt-0.5">Unidades físicas</span>
                     </div>
                 </div>
-            </div>
 
-            <div class="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 pt-2">
-                <button type="button" onclick="volverAtrasStock()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold py-2 px-3 rounded-lg transition text-center">
-                    ← Volver Atrás
-                </button>
-                <div class="flex gap-2">
-                    <button id="btnEliminarProdStock" type="button" onclick="eliminarProductoStock()" class="hidden bg-rose-900/80 hover:bg-rose-800 text-rose-200 border border-rose-600/50 text-xs px-3 py-2 rounded-lg font-bold transition flex items-center gap-1">
+                <div class="flex justify-between items-center gap-2 pt-2 border-t border-slate-700/80">
+                    <button type="button" onclick="eliminarProductoDesdeModalRapido()" class="bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-xs px-3 py-2 rounded-xl font-bold transition flex items-center gap-1">
                         🗑️ Eliminar
                     </button>
-                    <button onclick="cerrarModalStock()" class="flex-1 sm:flex-none bg-slate-700 text-xs px-3 py-2 rounded-lg font-bold">Cancelar</button>
-                    <button id="btnGuardarStock" disabled onclick="guardarNuevoStockCat()" class="flex-1 sm:flex-none bg-amber-600 opacity-50 cursor-not-allowed text-xs px-4 py-2 rounded-lg font-bold text-white transition">
-                        Guardar
-                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="cerrarModalEditarRapido()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-xl font-bold transition">Cancelar</button>
+                        <button type="submit" class="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl shadow-lg transition">
+                            Guardar Cambios
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 
