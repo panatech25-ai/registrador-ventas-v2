@@ -193,16 +193,17 @@ function aplicarPermisosEnUI() {
         else bottomNavUsuarios.classList.add('hidden');
     }
 
-    // 6. Botón Incanto Mayorista (SOLO para Incanto)
+    // 6. Botón Incanto Mayorista (SOLO para Incanto y si tiene permiso o es admin)
     const esIncanto = MARCA_ACTUAL === 'incanto';
+    const puedeMayorista = esIncanto && (ES_ADMIN || !!PERMISOS_ACTUALES.mayorista);
     const sideNavMayorista = document.getElementById('sideNavMayorista');
     const bottomNavMayorista = document.getElementById('bottomNavMayorista');
     if (sideNavMayorista) {
-        if (esIncanto) sideNavMayorista.classList.remove('hidden');
+        if (puedeMayorista) sideNavMayorista.classList.remove('hidden');
         else sideNavMayorista.classList.add('hidden');
     }
     if (bottomNavMayorista) {
-        if (esIncanto) bottomNavMayorista.classList.remove('hidden');
+        if (puedeMayorista) bottomNavMayorista.classList.remove('hidden');
         else bottomNavMayorista.classList.add('hidden');
     }
 
@@ -1739,6 +1740,7 @@ async function cargarListaUsuarios() {
                 if (u.incanto.permisos?.busqueda) incaPermisos.push('Buscar');
                 if (u.incanto.permisos?.stock) incaPermisos.push('Stock');
                 if (u.incanto.permisos?.informes) incaPermisos.push('Informes');
+                if (u.incanto.permisos?.mayorista) incaPermisos.push('Mayorista');
             }
 
             return `
@@ -1798,6 +1800,7 @@ function mostrarFormularioNuevoUsuario() {
     document.getElementById('p_inca_busqueda').checked = false;
     document.getElementById('p_inca_stock').checked = false;
     document.getElementById('p_inca_informes').checked = false;
+    document.getElementById('p_inca_mayorista').checked = false;
 
     togglePermisosMarca('panatech');
     togglePermisosMarca('incanto');
@@ -1862,6 +1865,7 @@ function editarUsuario(username) {
     document.getElementById('p_inca_busqueda').checked = !!u.incanto?.permisos?.busqueda;
     document.getElementById('p_inca_stock').checked = !!u.incanto?.permisos?.stock;
     document.getElementById('p_inca_informes').checked = !!u.incanto?.permisos?.informes;
+    document.getElementById('p_inca_mayorista').checked = !!u.incanto?.permisos?.mayorista;
 
     togglePermisosMarca('panatech');
     togglePermisosMarca('incanto');
@@ -1907,7 +1911,8 @@ async function guardarUsuarioForm() {
                     nueva_orden: habIncanto && document.getElementById('p_inca_nueva').checked,
                     busqueda: habIncanto && document.getElementById('p_inca_busqueda').checked,
                     stock: habIncanto && document.getElementById('p_inca_stock').checked,
-                    informes: habIncanto && document.getElementById('p_inca_informes').checked
+                    informes: habIncanto && document.getElementById('p_inca_informes').checked,
+                    mayorista: habIncanto && document.getElementById('p_inca_mayorista').checked
                 }
             }
         }

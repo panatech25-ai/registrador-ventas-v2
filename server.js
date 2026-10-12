@@ -37,7 +37,7 @@ const USUARIOS_DEFAULT = [
         },
         incanto: {
             habilitado: true,
-            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true }
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true, mayorista: true }
         }
     },
     {
@@ -49,7 +49,7 @@ const USUARIOS_DEFAULT = [
         },
         incanto: {
             habilitado: true,
-            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true }
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true, mayorista: true }
         }
     },
     {
@@ -1274,7 +1274,8 @@ app.post('/api/usuarios', async (req, res) => {
                     nueva_orden: !!(usuario.incanto?.permisos?.nueva_orden),
                     busqueda: !!(usuario.incanto?.permisos?.busqueda),
                     stock: !!(usuario.incanto?.permisos?.stock),
-                    informes: !!(usuario.incanto?.permisos?.informes)
+                    informes: !!(usuario.incanto?.permisos?.informes),
+                    mayorista: !!(usuario.incanto?.permisos?.mayorista)
                 }
             }
         };

@@ -141,22 +141,24 @@ function generarHTMLReporteMayorista({ transacciones = [], productos = [], cotiz
     <!-- BARRA FLOTANTE DE CONTROL (NO SE IMPRIME EN PDF) -->
     <header class="no-print sticky top-2 z-50 w-full max-w-4xl bg-slate-900/95 backdrop-blur-md border border-pink-500/40 p-2.5 sm:p-3.5 rounded-2xl shadow-2xl mb-3 sm:mb-4">
         <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-                <a href="/app.html?marca=incanto&usuario=${encodeURIComponent(usuario)}" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Volver a la App">
+            <div class="flex items-center gap-2 min-w-0">
+                <a href="/app.html?marca=incanto&usuario=${encodeURIComponent(usuario)}" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0" title="Volver a la App">
                     ← <span class="hidden sm:inline">Volver</span>
                 </a>
-                <div>
-                    <div class="text-xs sm:text-sm font-extrabold text-pink-400 flex items-center gap-1.5">
-                        <span>💎 Incanto Mayorista • Informe PDF</span>
+                <div class="min-w-0">
+                    <div class="text-xs sm:text-sm font-extrabold text-pink-400 flex items-center gap-1.5 truncate">
+                        <span>💎 Incanto Mayorista</span>
                     </div>
-                    <div class="text-[10px] text-slate-400">${periodoTexto}</div>
+                    <div class="text-[10px] text-slate-400 font-semibold truncate" title="${periodoTexto}">
+                        📅 ${periodoTexto}
+                    </div>
                 </div>
             </div>
 
             <!-- Botón de Descarga -->
-            <div class="flex items-center gap-2">
-                <button type="button" onclick="descargarPDFDirecto()" id="btnDescargarPDF" class="bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95">
-                    📄 <span>Descargar PDF</span>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="descargarPDFDirecto()" id="btnDescargarPDF" class="bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold text-xs px-3 py-2 rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95">
+                    📄 <span>PDF</span>
                 </button>
             </div>
         </div>
@@ -167,25 +169,25 @@ function generarHTMLReporteMayorista({ transacciones = [], productos = [], cotiz
 
         <!-- 1. ENCABEZADO EJECUTIVO / IDENTIDAD DE MARCA -->
         <section class="report-card p-4 sm:p-5 bg-gradient-to-r from-pink-950 via-slate-900 to-purple-950 border border-pink-500/40">
-            <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-2xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-3xl shadow-inner flex-shrink-0">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-2xl sm:text-3xl shadow-inner shrink-0">
                         💎
                     </div>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h1 class="text-xl sm:text-2xl font-black text-white tracking-wide">INCANTO MAYORISTA</h1>
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <h1 class="text-lg sm:text-2xl font-black text-white tracking-wide">INCANTO MAYORISTA</h1>
                             <span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">
                                 Stock Independiente
                             </span>
                         </div>
-                        <p class="text-[11px] sm:text-xs text-slate-400 font-medium">Informe Ejecutivo de Gestión, Compras, Ventas e Inventario</p>
+                        <p class="text-[10px] sm:text-xs text-slate-400 font-medium">Informe Ejecutivo de Gestión, Compras, Ventas e Inventario</p>
                     </div>
                 </div>
 
-                <div class="text-right">
-                    <div class="text-[11px] sm:text-xs font-black text-pink-300 uppercase tracking-wider">Período Seleccionado</div>
-                    <div class="text-xs font-bold text-white mt-0.5">${periodoTexto}</div>
+                <div class="text-left sm:text-right pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 shrink-0">
+                    <div class="text-[10px] sm:text-xs font-black text-pink-300 uppercase tracking-wider">Período de Análisis</div>
+                    <div class="text-xs sm:text-sm font-extrabold text-white mt-0.5 break-words">${periodoTexto}</div>
                     <div class="text-[10px] text-slate-400 mt-0.5">Emisión: ${fechaHoyStr}</div>
                 </div>
             </div>
