@@ -5,7 +5,7 @@ const path = require('path');
 const { generarReporteVentasAvanzado } = require('./excelService');
 const { generarHTMLPresentacion } = require('./reportePresentacionService');
 const { generarHTMLReporteMayorista } = require('./reporteMayoristaService');
-const { sincronizarProductosPanatech, obtenerMetadataPanatech } = require('./panatechScraperService');
+const { sincronizarProductosPanatech, obtenerMetadataPanatech, guardarMetadataPanatech } = require('./panatechScraperService');
 
 const app = express();
 app.use(express.json());
@@ -560,7 +560,6 @@ app.post('/api/productos/unificar', async (req, res) => {
                 };
             }
             delete metadata[prodEliminar.id];
-            const { guardarMetadataPanatech } = require('./panatechScraperService');
             await guardarMetadataPanatech(supabase, metadata);
         }
 

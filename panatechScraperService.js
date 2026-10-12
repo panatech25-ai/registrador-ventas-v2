@@ -492,5 +492,6 @@ module.exports = {
     scrapePanatechProductos,
     sincronizarProductosPanatech,
     obtenerMetadataPanatech,
+    guardarMetadataPanatech,
     normalizeName
 };
