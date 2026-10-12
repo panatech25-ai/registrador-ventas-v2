@@ -840,6 +840,12 @@
                         <span id="textSyncWeb">Sincronizar Tienda Online</span>
                     </button>
 
+                    <!-- Botón Unificar Productos -->
+                    <button type="button" onclick="abrirModalUnificarProductos()" class="bg-violet-900/60 hover:bg-violet-800 text-violet-200 border border-violet-700/60 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow active:scale-95" title="Unificar dos productos duplicados trasladando historial">
+                        <span>🔗</span>
+                        <span class="hidden sm:inline">Unificar Productos</span>
+                    </button>
+
                     <!-- Botón Agregar Producto Manual -->
                     <button type="button" onclick="abrirModalManual()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center gap-1.5">
                         <span>➕</span>
@@ -967,6 +973,90 @@
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal Unificar Productos -->
+    <div id="modalUnificarProductos" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-60 flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+        <div class="bg-slate-900 border border-violet-500/40 rounded-2xl max-w-3xl w-full p-4 sm:p-6 space-y-4 shadow-2xl my-auto">
+            <div class="flex justify-between items-start border-b border-slate-750 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl p-2 bg-violet-950/80 rounded-xl border border-violet-700/40 text-violet-400">🔗</span>
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Unificar Productos Duplicados</h3>
+                        <p class="text-[11px] text-slate-400">
+                            Elegí dos productos: uno será el <b class="text-emerald-400">conservado</b> y el otro el <b class="text-rose-400">unificado/eliminado</b>. El historial de ventas se trasladará al conservado.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="cerrarModalUnificarProductos()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
+            </div>
+
+            <!-- Selectores de los 2 productos -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Columna Producto A -->
+                <div class="bg-slate-850 p-3 sm:p-4 rounded-xl border border-slate-750 space-y-3 flex flex-col justify-between">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Producto 1</label>
+                        <div class="relative">
+                            <input type="text" id="buscarUnificarInputA" oninput="filtrarOpcionesUnificar('A', this.value)" placeholder="Buscar producto 1..." class="w-full bg-slate-950 border border-slate-750 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                            <div id="sugerenciasUnificarA" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta Vista Previa Producto A -->
+                    <div id="previewUnificarA" class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 min-h-[140px] flex flex-col justify-center items-center text-center text-slate-500 text-xs">
+                        <span>Seleccioná el primer producto</span>
+                    </div>
+
+                    <!-- Radio para elegir conservar A -->
+                    <label id="labelRadioConsA" class="hidden cursor-pointer flex items-center gap-2 p-2.5 rounded-xl border border-slate-750 hover:bg-slate-800 transition">
+                        <input type="radio" name="radioConservar" value="A" id="radioConsA" checked class="text-emerald-500 focus:ring-0">
+                        <span class="text-xs font-bold text-emerald-400">🟢 Conservar Producto 1 como Definitivo</span>
+                    </label>
+                </div>
+
+                <!-- Columna Producto B -->
+                <div class="bg-slate-850 p-3 sm:p-4 rounded-xl border border-slate-750 space-y-3 flex flex-col justify-between">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Producto 2</label>
+                        <div class="relative">
+                            <input type="text" id="buscarUnificarInputB" oninput="filtrarOpcionesUnificar('B', this.value)" placeholder="Buscar producto 2..." class="w-full bg-slate-950 border border-slate-750 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                            <div id="sugerenciasUnificarB" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta Vista Previa Producto B -->
+                    <div id="previewUnificarB" class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 min-h-[140px] flex flex-col justify-center items-center text-center text-slate-500 text-xs">
+                        <span>Seleccioná el segundo producto</span>
+                    </div>
+
+                    <!-- Radio para elegir conservar B -->
+                    <label id="labelRadioConsB" class="hidden cursor-pointer flex items-center gap-2 p-2.5 rounded-xl border border-slate-750 hover:bg-slate-800 transition">
+                        <input type="radio" name="radioConservar" value="B" id="radioConsB" class="text-emerald-500 focus:ring-0">
+                        <span class="text-xs font-bold text-emerald-400">🟢 Conservar Producto 2 como Definitivo</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Opciones y Confirmación -->
+            <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" id="checkSumarStockUnificar" checked class="rounded bg-slate-800 border-slate-700 text-violet-500 focus:ring-0">
+                    <span>Sumar el stock del producto absorbido al conservado</span>
+                </label>
+                <span class="text-[11px] text-slate-400 italic">⚠️ El producto absorbido se eliminará sin perder ventas pasadas</span>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-2 border-t border-slate-800">
+                <button type="button" onclick="cerrarModalUnificarProductos()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2.5 px-4 rounded-xl font-bold transition">
+                    Cancelar
+                </button>
+                <button type="button" id="btnConfirmarUnificar" onclick="ejecutarUnificacionConfirmada()" disabled class="bg-violet-600 opacity-50 cursor-not-allowed hover:bg-violet-500 text-white text-xs py-2.5 px-5 rounded-xl font-bold shadow-lg transition flex items-center gap-2">
+                    <span>🔗</span>
+                    <span>Confirmar Unificación</span>
+                </button>
+            </div>
         </div>
     </div>
 

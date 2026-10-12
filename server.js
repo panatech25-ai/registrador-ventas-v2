@@ -500,6 +500,95 @@ app.put('/api/productos/:id/stock', async (req, res) => {
     }
 });
 
+// API Unificar dos productos (traslada historial de ventas, opcionalmente stock, y elimina el absorbido)
+app.post('/api/productos/unificar', async (req, res) => {
+    const { idConservar, idEliminar, sumarStock } = req.body;
+
+    if (!idConservar || !idEliminar) {
+        return res.status(400).json({ success: false, error: 'Debes especificar el producto a conservar y el producto a unificar/eliminar.' });
+    }
+
+    if (String(idConservar) === String(idEliminar)) {
+        return res.status(400).json({ success: false, error: 'No puedes unificar un producto consigo mismo.' });
+    }
+
+    try {
+        // 1. Obtener ambos productos
+        const { data: prods, error: fetchErr } = await supabase
+            .from('productos')
+            .select('*')
+            .in('id', [idConservar, idEliminar]);
+
+        if (fetchErr) throw fetchErr;
+
+        const prodConservar = prods.find(p => String(p.id) === String(idConservar));
+        const prodEliminar = prods.find(p => String(p.id) === String(idEliminar));
+
+        if (!prodConservar || !prodEliminar) {
+            return res.status(404).json({ success: false, error: 'Uno o ambos productos no fueron encontrados en la base de datos.' });
+        }
+
+        // 2. Trasladar ventas históricas en orden_detalles del producto a eliminar al conservado
+        const { error: reasignarErr } = await supabase
+            .from('orden_detalles')
+            .update({ producto_id: prodConservar.id })
+            .eq('producto_id', prodEliminar.id);
+
+        if (reasignarErr) throw reasignarErr;
+
+        // 3. Opcionalmente sumar stock
+        let nuevoStock = prodConservar.stock;
+        if (sumarStock && prodEliminar.stock > 0) {
+            nuevoStock = prodConservar.stock + prodEliminar.stock;
+            await supabase
+                .from('productos')
+                .update({ stock: nuevoStock })
+                .eq('id', prodConservar.id);
+        }
+
+        // 4. Trasladar metadata si el conservado no tenía y el eliminado sí
+        if (prodConservar.marca === 'panatech') {
+            const metadata = await obtenerMetadataPanatech(supabase);
+            const metaEliminado = metadata[prodEliminar.id];
+            const metaConservar = metadata[prodConservar.id];
+
+            if (metaEliminado && (!metaConservar || !metaConservar.synced_web)) {
+                metadata[prodConservar.id] = {
+                    ...metaEliminado,
+                    synced_web: metaEliminado.synced_web,
+                    ultima_sync: new Date().toISOString()
+                };
+            }
+            delete metadata[prodEliminar.id];
+            const { guardarMetadataPanatech } = require('./panatechScraperService');
+            await guardarMetadataPanatech(supabase, metadata);
+        }
+
+        // 5. Eliminar el producto absorbido de la tabla productos (sus órdenes ya fueron migradas)
+        const { error: deleteErr } = await supabase
+            .from('productos')
+            .delete()
+            .eq('id', prodEliminar.id);
+
+        if (deleteErr) {
+            console.warn('No se pudo borrar físicamente el producto unificado, dejándolo en stock 0:', deleteErr.message);
+            await supabase.from('productos').update({ stock: 0 }).eq('id', prodEliminar.id);
+        }
+
+        res.json({
+            success: true,
+            mensaje: `¡Productos unificados con éxito! El historial de "${prodEliminar.nombre}" fue trasladado a "${prodConservar.nombre}".`,
+            productoConservado: {
+                ...prodConservar,
+                stock: nuevoStock
+            }
+        });
+    } catch (err) {
+        console.error('Error al unificar productos:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // API Eliminar Producto del Catálogo
 app.delete('/api/productos/:id', async (req, res) => {
     const { id } = req.params;

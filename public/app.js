@@ -1469,11 +1469,17 @@ function renderizarCatalogoFiltrado() {
                     </div>
                 </div>
 
-                <!-- Botón de Acción -->
-                <div class="pt-2 mt-2 border-t border-slate-800">
-                    <button type="button" onclick="abrirModalEditarRapido(${jsonProd})" class="w-full bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-200 text-xs font-bold py-1.5 px-3 rounded-xl border border-slate-700 hover:border-amber-500 transition flex items-center justify-center gap-1.5 shadow active:scale-95">
+                <!-- Botones de Acción -->
+                <div class="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1.5">
+                    <button type="button" onclick="abrirModalEditarPorId(${p.id})" class="flex-1 bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-200 text-xs font-bold py-2 px-3 rounded-xl border border-slate-700 hover:border-amber-500 transition flex items-center justify-center gap-1.5 shadow active:scale-95">
                         <span>✏️</span>
-                        <span>Editar Precio / Stock</span>
+                        <span>Editar</span>
+                    </button>
+                    <button type="button" onclick="abrirModalUnificarProductos(${p.id})" title="Unificar con otro producto" class="bg-slate-800 hover:bg-violet-900/80 text-slate-400 hover:text-violet-300 border border-slate-700 hover:border-violet-600 p-2 rounded-xl text-xs font-bold transition flex items-center justify-center shadow active:scale-95">
+                        <span>🔗</span>
+                    </button>
+                    <button type="button" onclick="eliminarProductoPorId(${p.id})" title="Eliminar producto" class="bg-slate-800 hover:bg-rose-900/80 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-600 p-2 rounded-xl text-xs font-bold transition flex items-center justify-center shadow active:scale-95">
+                        <span>🗑️</span>
                     </button>
                 </div>
             </div>
@@ -1513,6 +1519,43 @@ async function ejecutarSincronizacionWebPanatech() {
         if (btn) btn.disabled = false;
         if (icon) icon.className = '';
         if (text) text.textContent = 'Sincronizar Tienda Online';
+    }
+}
+
+// Helper para abrir edición por ID seguro (evita errores con comillas en atributos HTML)
+function abrirModalEditarPorId(id) {
+    const prod = CATALOGO_PRODUCTOS.find(p => p.id === id || String(p.id) === String(id));
+    if (!prod) {
+        showToast('Producto no encontrado.', 'warning');
+        return;
+    }
+    abrirModalEditarRapido(prod);
+}
+
+// Eliminar producto directamente por ID desde la tarjeta o modal
+async function eliminarProductoPorId(id) {
+    const prod = CATALOGO_PRODUCTOS.find(p => p.id === id || String(p.id) === String(id));
+    if (!prod) return;
+
+    if (!confirm(`¿Estás seguro de que deseas eliminar el producto "${prod.nombre}" del catálogo?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/productos/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.mensaje || 'Producto eliminado.', data.esReferenciado ? 'warning' : 'success');
+            CATALOGO_PRODUCTOS = CATALOGO_PRODUCTOS.filter(p => String(p.id) !== String(id));
+            actualizarContadoresStockPills(CATALOGO_PRODUCTOS);
+            renderizarCatalogoFiltrado();
+            cerrarModalEditarRapido();
+        } else {
+            showToast('Error al eliminar: ' + (data.error || ''), 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión al eliminar producto.', 'error');
     }
 }
 
@@ -1590,28 +1633,193 @@ async function guardarEdicionRapidaProducto(e) {
 
 async function eliminarProductoDesdeModalRapido() {
     const id = document.getElementById('editRapidoId').value;
-    const nombre = document.getElementById('editRapidoNombre').value;
+    if (id) {
+        await eliminarProductoPorId(id);
+    }
+}
 
-    if (!id) return;
-    if (!confirm(`¿Estás seguro de que deseas eliminar el producto "${nombre}" del catálogo?`)) {
+// ==========================================
+// UNIFICACIÓN DE PRODUCTOS
+// ==========================================
+let PRODUCTO_UNIFICAR_A = null;
+let PRODUCTO_UNIFICAR_B = null;
+
+function abrirModalUnificarProductos(idInicial = null) {
+    PRODUCTO_UNIFICAR_A = null;
+    PRODUCTO_UNIFICAR_B = null;
+
+    const modal = document.getElementById('modalUnificarProductos');
+    if (!modal) return;
+
+    document.getElementById('buscarUnificarInputA').value = '';
+    document.getElementById('buscarUnificarInputB').value = '';
+    document.getElementById('sugerenciasUnificarA').classList.add('hidden');
+    document.getElementById('sugerenciasUnificarB').classList.add('hidden');
+    document.getElementById('previewUnificarA').innerHTML = '<span class="italic">Buscá y seleccioná el primer producto</span>';
+    document.getElementById('previewUnificarB').innerHTML = '<span class="italic">Buscá y seleccioná el segundo producto</span>';
+    document.getElementById('labelRadioConsA').classList.add('hidden');
+    document.getElementById('labelRadioConsB').classList.add('hidden');
+    document.getElementById('radioConsA').checked = true;
+
+    const btn = document.getElementById('btnConfirmarUnificar');
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    if (idInicial) {
+        seleccionarProductoParaUnificar('A', idInicial);
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function cerrarModalUnificarProductos() {
+    const modal = document.getElementById('modalUnificarProductos');
+    if (modal) modal.classList.add('hidden');
+}
+
+function filtrarOpcionesUnificar(lado, termino) {
+    const contenedor = document.getElementById(`sugerenciasUnificar${lado}`);
+    const q = (termino || '').trim().toLowerCase();
+
+    if (!q) {
+        contenedor.classList.add('hidden');
         return;
     }
 
-    try {
-        const res = await fetch(`/api/productos/${id}`, { method: 'DELETE' });
-        const data = await res.json();
+    const matches = CATALOGO_PRODUCTOS.filter(p => {
+        const nom = (p.nombre || '').toLowerCase();
+        const sku = (p.codigo_sku || '').toLowerCase();
+        return nom.includes(q) || sku.includes(q);
+    }).slice(0, 15);
 
+    if (matches.length === 0) {
+        contenedor.innerHTML = '<div class="p-2 text-xs text-slate-400 text-center">Sin resultados</div>';
+    } else {
+        contenedor.innerHTML = matches.map(p => `
+            <div onclick="seleccionarProductoParaUnificar('${lado}', ${p.id})" class="p-2.5 hover:bg-slate-850 cursor-pointer border-b border-slate-800 text-xs text-white flex items-center justify-between gap-2 transition">
+                <div class="flex items-center gap-2 min-w-0">
+                    <img src="${p.imagen_url || '/img/no-image.svg'}" onerror="this.src='/img/no-image.svg'" class="w-8 h-8 rounded object-contain bg-slate-900 border border-slate-700 shrink-0">
+                    <div class="truncate">
+                        <b class="text-white">${p.nombre}</b>
+                        <span class="text-[10px] text-slate-400 block font-mono">${p.codigo_sku || ''} • Stock: ${p.stock}</span>
+                    </div>
+                </div>
+                <span class="text-emerald-400 font-bold shrink-0">$${(p.precio || 0).toLocaleString('es-AR')}</span>
+            </div>
+        `).join('');
+    }
+
+    contenedor.classList.remove('hidden');
+}
+
+function seleccionarProductoParaUnificar(lado, id) {
+    const prod = CATALOGO_PRODUCTOS.find(p => p.id === id || String(p.id) === String(id));
+    if (!prod) return;
+
+    if (lado === 'A') {
+        PRODUCTO_UNIFICAR_A = prod;
+        document.getElementById('buscarUnificarInputA').value = prod.nombre;
+        document.getElementById('sugerenciasUnificarA').classList.add('hidden');
+        renderizarPreviewUnificar('A', prod);
+        document.getElementById('labelRadioConsA').classList.remove('hidden');
+    } else {
+        PRODUCTO_UNIFICAR_B = prod;
+        document.getElementById('buscarUnificarInputB').value = prod.nombre;
+        document.getElementById('sugerenciasUnificarB').classList.add('hidden');
+        renderizarPreviewUnificar('B', prod);
+        document.getElementById('labelRadioConsB').classList.remove('hidden');
+    }
+
+    verificarEstadoBotonUnificar();
+}
+
+function renderizarPreviewUnificar(lado, p) {
+    const preview = document.getElementById(`previewUnificar${lado}`);
+    if (!preview) return;
+
+    const badgeOrigen = p.synced_web
+        ? `<span class="bg-sky-950/90 text-sky-400 border border-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-md">🌐 Tienda Web</span>`
+        : `<span class="bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">📁 Solo Sistema</span>`;
+
+    preview.innerHTML = `
+        <div class="flex items-center gap-3 w-full text-left">
+            <img src="${p.imagen_url || '/img/no-image.svg'}" onerror="this.src='/img/no-image.svg'" class="w-16 h-16 rounded-xl object-contain bg-slate-950 border border-slate-800 shrink-0">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    ${badgeOrigen}
+                    <span class="text-[10px] font-mono text-slate-400">${p.codigo_sku || ''}</span>
+                </div>
+                <h4 class="text-xs font-bold text-white truncate" title="${p.nombre}">${p.nombre}</h4>
+                <div class="flex items-center justify-between mt-1 text-xs">
+                    <span class="text-emerald-400 font-bold">$${(p.precio || 0).toLocaleString('es-AR')}</span>
+                    <span class="${p.stock > 0 ? 'text-amber-400' : 'text-rose-400'} font-semibold font-mono">Stock: ${p.stock} u.</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function verificarEstadoBotonUnificar() {
+    const btn = document.getElementById('btnConfirmarUnificar');
+    if (!btn) return;
+
+    if (PRODUCTO_UNIFICAR_A && PRODUCTO_UNIFICAR_B && PRODUCTO_UNIFICAR_A.id !== PRODUCTO_UNIFICAR_B.id) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+async function ejecutarUnificacionConfirmada() {
+    if (!PRODUCTO_UNIFICAR_A || !PRODUCTO_UNIFICAR_B) return;
+    if (PRODUCTO_UNIFICAR_A.id === PRODUCTO_UNIFICAR_B.id) {
+        showToast('Debes seleccionar dos productos distintos para unificar.', 'warning');
+        return;
+    }
+
+    const conservadoLado = document.querySelector('input[name="radioConservar"]:checked')?.value || 'A';
+    const prodConservar = conservadoLado === 'A' ? PRODUCTO_UNIFICAR_A : PRODUCTO_UNIFICAR_B;
+    const prodEliminar = conservadoLado === 'A' ? PRODUCTO_UNIFICAR_B : PRODUCTO_UNIFICAR_A;
+    const sumarStock = document.getElementById('checkSumarStockUnificar').checked;
+
+    const mensajeConfirm = `¿Confirmás la unificación?\n\n• SE CONSERVA: "${prodConservar.nombre}"\n• SE ABSORBE Y ELIMINA: "${prodEliminar.nombre}"\n\nTodo el historial de ventas del producto absorbido pasará al conservado.`;
+    if (!confirm(mensajeConfirm)) {
+        return;
+    }
+
+    const btn = document.getElementById('btnConfirmarUnificar');
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span><span>Unificando...</span>';
+
+    try {
+        const res = await fetch('/api/productos/unificar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                idConservar: prodConservar.id,
+                idEliminar: prodEliminar.id,
+                sumarStock
+            })
+        });
+
+        const data = await res.json();
         if (data.success) {
-            showToast(data.mensaje || 'Producto eliminado.', data.esReferenciado ? 'warning' : 'success');
-            CATALOGO_PRODUCTOS = CATALOGO_PRODUCTOS.filter(p => String(p.id) !== String(id));
-            actualizarContadoresStockPills(CATALOGO_PRODUCTOS);
-            renderizarCatalogoFiltrado();
-            cerrarModalEditarRapido();
+            showToast(data.mensaje || 'Productos unificados correctamente.', 'success');
+            cerrarModalUnificarProductos();
+            await cargarCatalogoProductos();
         } else {
-            showToast('Error al eliminar: ' + (data.error || ''), 'error');
+            showToast('Error al unificar: ' + (data.error || ''), 'error');
         }
     } catch (err) {
-        showToast('Error de conexión al eliminar producto.', 'error');
+        console.error('Error al unificar productos:', err);
+        showToast('Error de conexión al unificar productos.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔗</span><span>Confirmar Unificación</span>';
     }
 }
 
