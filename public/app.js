@@ -711,10 +711,13 @@ function cambiarSeccion(seccion) {
     const bgActivo = esIncanto ? 'bg-rose-600' : 'bg-sky-600';
     const textActivo = esIncanto ? 'text-rose-400' : 'text-sky-400';
 
+    const kpisSuperiores = document.getElementById('contenedorKpisSuperiores');
+
     if (seccion === 'nueva') {
         if (secNueva) secNueva.classList.remove('hidden');
         if (secBusqueda) secBusqueda.classList.add('hidden');
         if (secMayorista) secMayorista.classList.add('hidden');
+        if (kpisSuperiores) kpisSuperiores.classList.remove('hidden');
 
         // Menú Lateral Desktop
         if (sideNueva) {
@@ -743,6 +746,7 @@ function cambiarSeccion(seccion) {
         if (secNueva) secNueva.classList.add('hidden');
         if (secBusqueda) secBusqueda.classList.remove('hidden');
         if (secMayorista) secMayorista.classList.add('hidden');
+        if (kpisSuperiores) kpisSuperiores.classList.remove('hidden');
 
         // Menú Lateral Desktop
         if (sideNueva) {
@@ -773,6 +777,7 @@ function cambiarSeccion(seccion) {
         if (secNueva) secNueva.classList.add('hidden');
         if (secBusqueda) secBusqueda.classList.add('hidden');
         if (secMayorista) secMayorista.classList.remove('hidden');
+        if (kpisSuperiores) kpisSuperiores.classList.add('hidden');
 
         // Menú Lateral Desktop
         if (sideNueva) {
@@ -2281,4 +2286,60 @@ async function cargarTransaccionesMayorista() {
     } catch (err) {
         console.error('Error al cargar transacciones:', err);
     }
+}
+
+// ==========================================
+// MODAL REPORTE PDF INCANTO MAYORISTA
+// ==========================================
+function abrirModalReporteMayorista() {
+    const modal = document.getElementById('modalExportarMayorista');
+    if (!modal) return;
+    
+    // Inicializar fechas por defecto (este mes)
+    const hoyStr = new Date().toISOString().split('T')[0];
+    const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const inputInicio = document.getElementById('exportMayFechaInicio');
+    const inputFin = document.getElementById('exportMayFechaFin');
+    if (inputInicio && !inputInicio.value) inputInicio.value = primerDiaMes;
+    if (inputFin && !inputFin.value) inputFin.value = hoyStr;
+
+    modal.classList.remove('hidden');
+}
+
+function cerrarModalReporteMayorista() {
+    const modal = document.getElementById('modalExportarMayorista');
+    if (modal) modal.classList.add('hidden');
+}
+
+function setPresetExportMayorista(tipo) {
+    const hoyStr = new Date().toISOString().split('T')[0];
+    const inputInicio = document.getElementById('exportMayFechaInicio');
+    const inputFin = document.getElementById('exportMayFechaFin');
+    if (!inputInicio || !inputFin) return;
+
+    if (tipo === 'hoy') {
+        inputInicio.value = hoyStr;
+        inputFin.value = hoyStr;
+    } else if (tipo === 'mes') {
+        const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        inputInicio.value = primerDiaMes;
+        inputFin.value = hoyStr;
+    } else if (tipo === 'todo') {
+        inputInicio.value = '';
+        inputFin.value = '';
+    }
+}
+
+function descargarInformePDFMayorista(autoPdf = true) {
+    const desde = document.getElementById('exportMayFechaInicio')?.value || '';
+    const hasta = document.getElementById('exportMayFechaFin')?.value || '';
+
+    showToast('Generando informe profesional en PDF de Incanto Mayorista...', 'info');
+    const url = `/reporte-mayorista?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&usuario=${encodeURIComponent(USUARIO_ACTUAL)}${autoPdf ? '&autoPdf=1' : ''}`;
+    window.open(url, '_blank');
+    cerrarModalReporteMayorista();
+}
+
+function abrirReporteMayoristaEnPantalla() {
+    descargarInformePDFMayorista(false);
 }

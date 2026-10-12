@@ -126,7 +126,7 @@
         </header>
 
         <!-- Mini Dashboard de Métricas Rápidas del Día -->
-        <section class="max-w-7xl mx-auto px-4 pt-3 pb-1 w-full">
+        <section id="contenedorKpisSuperiores" class="max-w-7xl mx-auto px-4 pt-3 pb-1 w-full">
             <div class="grid grid-cols-3 gap-2 sm:gap-4 bg-slate-800/80 border border-slate-700/70 p-2.5 sm:p-3 rounded-2xl shadow-lg">
                 <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
                     <div class="text-base sm:text-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-1.5 sm:p-2 rounded-lg">💰</div>
@@ -422,14 +422,23 @@
                         </div>
                     </div>
 
-                    <!-- Cotización MEP en vivo -->
-                    <div class="bg-slate-900/90 border border-slate-700/80 px-3 py-2 rounded-xl flex items-center gap-3 shadow-md self-stretch sm:self-auto justify-between sm:justify-start">
-                        <div class="text-left">
-                            <span class="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">Dólar MEP (Bolsa)</span>
-                            <span id="valorDolarMepDisplay" class="text-xs sm:text-sm font-black text-emerald-400">Cargando...</span>
+                    <!-- Controles: Cotización MEP y Botón PDF -->
+                    <div class="flex items-center gap-2 self-stretch sm:self-auto justify-between sm:justify-start">
+                        <!-- Cotización MEP en vivo -->
+                        <div class="bg-slate-900/90 border border-slate-700/80 px-3 py-2 rounded-xl flex items-center gap-2.5 shadow-md">
+                            <div class="text-left">
+                                <span class="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">Dólar MEP (Bolsa)</span>
+                                <span id="valorDolarMepDisplay" class="text-xs sm:text-sm font-black text-emerald-400">Cargando...</span>
+                            </div>
+                            <button type="button" onclick="cargarCotizacionMep(true)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" title="Actualizar cotización">
+                                🔄
+                            </button>
                         </div>
-                        <button type="button" onclick="cargarCotizacionMep(true)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" title="Actualizar cotización">
-                            🔄
+
+                        <!-- Botón Descargar Informe PDF Mayorista -->
+                        <button type="button" onclick="abrirModalReporteMayorista()" class="bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5 border border-pink-500/30" title="Generar Informe PDF de Incanto Mayorista">
+                            <span class="text-base">📄</span>
+                            <span class="hidden sm:inline font-extrabold tracking-wide">Informe PDF</span>
                         </button>
                     </div>
                 </div>
@@ -724,6 +733,78 @@
                         📊 <span>Descargar Excel Completo</span>
                     </button>
                     <button type="button" onclick="cerrarModalExportar()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs px-3 py-2 rounded-xl font-semibold">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Informes y Presentaciones Incanto Mayorista (PDF con Gráficos y KPIs) -->
+    <div id="modalExportarMayorista" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-pink-500/40 p-5 sm:p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">💎</span>
+                    <div>
+                        <h3 class="text-sm font-bold text-pink-400 uppercase tracking-wider">
+                            Informe PDF Incanto Mayorista
+                        </h3>
+                        <p class="text-[10px] text-slate-400">Descargá el informe ejecutivo con KPIs, balance de compras/ventas y gráficos de torta</p>
+                    </div>
+                </div>
+                <button onclick="cerrarModalReporteMayorista()" class="text-slate-400 hover:text-white text-sm font-bold">✕</button>
+            </div>
+            
+            <div class="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl text-[11px] text-slate-300 space-y-1.5">
+                <div class="font-bold text-pink-300 flex items-center gap-1">
+                    <span>✨ Incluye en el informe PDF:</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[10px] pt-0.5">
+                    <div class="bg-slate-800/80 p-2 rounded-lg border border-slate-700/60">
+                        <strong class="text-rose-400 block text-[11px]">🥧 Gráficos de Torta</strong>
+                        Distribución de ventas por producto y balance ventas vs compras.
+                    </div>
+                    <div class="bg-slate-800/80 p-2 rounded-lg border border-slate-700/60">
+                        <strong class="text-emerald-400 block text-[11px]">📈 KPIs & Cotización</strong>
+                        Facturación, ticket promedio, stock de Splash y valor en u$d MEP.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accesos rápidos de fechas -->
+            <div class="space-y-1.5">
+                <label class="block text-[10px] text-slate-400 font-bold uppercase">Período de Análisis</label>
+                <div class="grid grid-cols-3 gap-1.5">
+                    <button type="button" onclick="setPresetExportMayorista('hoy')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Hoy</button>
+                    <button type="button" onclick="setPresetExportMayorista('mes')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Este Mes</button>
+                    <button type="button" onclick="setPresetExportMayorista('todo')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Todo el Historial</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-bold">Desde</label>
+                    <input type="date" id="exportMayFechaInicio" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-bold">Hasta</label>
+                    <input type="date" id="exportMayFechaFin" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Botones de Acción de Exportación -->
+            <div class="pt-2 border-t border-slate-700/80 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" onclick="descargarInformePDFMayorista(true)" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-xs py-2.5 px-3 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-1.5 active:scale-95">
+                        📄 <span>Descargar PDF</span>
+                    </button>
+                    <button type="button" onclick="abrirReporteMayoristaEnPantalla()" class="bg-slate-700 hover:bg-slate-600 text-xs py-2.5 px-3 rounded-xl font-bold text-slate-200 border border-slate-600 shadow transition flex items-center justify-center gap-1.5">
+                        🖥️ <span>Ver en Pantalla</span>
+                    </button>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" onclick="cerrarModalReporteMayorista()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-2 rounded-xl font-semibold">
                         Cerrar
                     </button>
                 </div>

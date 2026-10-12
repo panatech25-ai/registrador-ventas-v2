@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const { generarReporteVentasAvanzado } = require('./excelService');
 const { generarHTMLPresentacion } = require('./reportePresentacionService');
+const { generarHTMLReporteMayorista } = require('./reporteMayoristaService');
 
 const app = express();
 app.use(express.json());
@@ -1111,6 +1112,84 @@ app.post('/api/mayorista/compras', async (req, res) => {
     } catch (err) {
         console.error('Error al registrar compra mayorista:', err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Endpoint para Informe Ejecutivo en PDF / Pantalla de Incanto Mayorista
+app.get('/reporte-mayorista', async (req, res) => {
+    const { desde, hasta, usuario } = req.query;
+
+    try {
+        // 1. Obtener transacciones mayoristas filtradas por fecha
+        let queryTrans = supabase
+            .from('ordenes')
+            .select('*')
+            .ilike('numero_orden', '#INC-MAY-%')
+            .order('id', { ascending: false });
+
+        if (desde) queryTrans = queryTrans.gte('fecha', desde);
+        if (hasta) queryTrans = queryTrans.lte('fecha', hasta);
+
+        const { data: rawTrans, error: errTrans } = await queryTrans;
+        if (errTrans) throw errTrans;
+
+        const transacciones = (rawTrans || []).map(t => {
+            let detalleJson = null;
+            try {
+                detalleJson = t.observaciones ? JSON.parse(t.observaciones) : null;
+            } catch (e) {
+                detalleJson = { texto: t.observaciones };
+            }
+            const esVenta = (t.numero_orden || '').includes('VTA');
+            return {
+                id: t.id,
+                numero: t.numero_orden,
+                tipo: esVenta ? 'venta' : 'compra',
+                fecha: t.fecha,
+                persona: t.cliente_nombre,
+                producto: detalleJson?.producto_nombre || 'Producto',
+                cantidad: detalleJson?.cantidad || 1,
+                precio_unitario: detalleJson?.precio_unitario || 0,
+                total: parseFloat(t.total) || 0,
+                vendedor: t.vendedor
+            };
+        });
+
+        // 2. Obtener productos de stock mayorista
+        const { data: productos, error: errProds } = await supabase
+            .from('productos')
+            .select('*')
+            .eq('marca', 'incanto_mayorista');
+
+        if (errProds) throw errProds;
+
+        // 3. Obtener cotización MEP
+        let cotizacionMep = 1540;
+        if (dolarMepCache && dolarMepCache.venta) {
+            cotizacionMep = dolarMepCache.venta;
+        } else {
+            try {
+                const respMep = await fetch('https://dolarapi.com/v1/dolares/bolsa');
+                if (respMep.ok) {
+                    const dataMep = await respMep.json();
+                    cotizacionMep = parseFloat(dataMep.venta) || 1540;
+                }
+            } catch (e) {}
+        }
+
+        const html = generarHTMLReporteMayorista({
+            transacciones,
+            productos: productos || [],
+            cotizacionMep,
+            desde,
+            hasta,
+            usuario: usuario || 'sistema'
+        });
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(html);
+    } catch (err) {
+        res.status(500).send(`Error al generar reporte de Incanto Mayorista: ${err.message}`);
     }
 });
 
