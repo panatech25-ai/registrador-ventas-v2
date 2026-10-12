@@ -692,7 +692,428 @@ app.put('/api/ordenes/:id', async (req, res) => {
 });
 
 // ==========================================
-// APIS GESTIÓN DE USUARIOS Y PERMISOS
+// MÓDULO INCANTO MAYORISTA (Stock separado, Compras, Ventas, Métricas & MEP)
+// ==========================================
+
+// Cache en memoria para la cotización del Dólar MEP (10 minutos)
+let dolarMepCache = null;
+let ultimaCotizacionMep = 0;
+
+app.get('/api/dolar/mep', async (req, res) => {
+    const ahora = Date.now();
+    if (dolarMepCache && (ahora - ultimaCotizacionMep < 10 * 60 * 1000)) {
+        return res.json(dolarMepCache);
+    }
+
+    try {
+        const respuesta = await fetch('https://dolarapi.com/v1/dolares/bolsa');
+        if (!respuesta.ok) throw new Error('Error al consultar DolarAPI');
+        const data = await respuesta.json();
+        
+        const valorVenta = parseFloat(data.venta) || 1540;
+        const valorCompra = parseFloat(data.compra) || 1530;
+        
+        dolarMepCache = {
+            mep: valorVenta,
+            compra: valorCompra,
+            venta: valorVenta,
+            fechaActualizacion: data.fechaActualizacion || new Date().toISOString()
+        };
+        ultimaCotizacionMep = ahora;
+        res.json(dolarMepCache);
+    } catch (err) {
+        console.error('Error al obtener Dólar MEP:', err.message);
+        // Si falla, responder con cache previo o fallback prudente
+        const fallback = dolarMepCache || { mep: 1540, compra: 1530, venta: 1540, fallback: true };
+        res.json(fallback);
+    }
+});
+
+// Métricas de Incanto Mayorista
+// 1. Ventas del mes
+// 2. Cantidad de Splash (stock de productos con nombre que contenga 'splash')
+// 3. Valor estimado total en $ (suma de precio * stock)
+app.get('/api/mayorista/metricas', async (req, res) => {
+    try {
+        const hoy = new Date();
+        const inicioMesStr = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+
+        // 1. Ventas del mes: órdenes con prefijo #INC-MAY-VTA-
+        const { data: ventasMes, error: errVentas } = await supabase
+            .from('ordenes')
+            .select('total, estado, fecha')
+            .ilike('numero_orden', '#INC-MAY-VTA-%')
+            .gte('fecha', inicioMesStr);
+
+        if (errVentas) throw errVentas;
+
+        const totalVentasMes = (ventasMes || [])
+            .filter(v => v.estado !== 'Cancelado')
+            .reduce((acc, v) => acc + (parseFloat(v.total) || 0), 0);
+
+        // 2 & 3. Stock y valor estimado de productos mayorista
+        const { data: productos, error: errProds } = await supabase
+            .from('productos')
+            .select('id, nombre, stock, precio')
+            .eq('marca', 'incanto_mayorista');
+
+        if (errProds) throw errProds;
+
+        let cantidadSplash = 0;
+        let valorEstimadoTotal = 0;
+
+        (productos || []).forEach(p => {
+            const stock = parseInt(p.stock) || 0;
+            const precio = parseFloat(p.precio) || 0;
+            if (stock > 0) {
+                valorEstimadoTotal += (stock * precio);
+            }
+            if ((p.nombre || '').toLowerCase().includes('splash')) {
+                cantidadSplash += stock;
+            }
+        });
+
+        res.json({
+            ventasMes: totalVentasMes,
+            cantidadSplash,
+            valorEstimado: valorEstimadoTotal,
+            totalProductos: (productos || []).length
+        });
+    } catch (err) {
+        console.error('Error al calcular métricas mayorista:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Listar productos / catálogo propio de Incanto Mayorista
+app.get('/api/mayorista/productos', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('productos')
+            .select('*')
+            .eq('marca', 'incanto_mayorista')
+            .order('nombre', { ascending: true });
+
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Crear o actualizar producto en stock mayorista
+app.post('/api/mayorista/productos', async (req, res) => {
+    const { id, nombre, variante, precio, stock } = req.body;
+    if (!nombre) {
+        return res.status(400).json({ error: 'El nombre del producto es requerido.' });
+    }
+
+    try {
+        if (id) {
+            // Actualizar
+            const { data, error } = await supabase
+                .from('productos')
+                .update({
+                    nombre,
+                    variante: variante || 'Mayorista',
+                    precio: parseFloat(precio) || 0,
+                    stock: parseInt(stock) || 0
+                })
+                .eq('id', id)
+                .eq('marca', 'incanto_mayorista')
+                .select()
+                .single();
+
+            if (error) throw error;
+            return res.json({ success: true, producto: data });
+        } else {
+            // Crear
+            const codigo_sku = `MAY-${Date.now().toString().slice(-6)}`;
+            const { data, error } = await supabase
+                .from('productos')
+                .insert([{
+                    codigo_sku,
+                    nombre,
+                    variante: variante || 'Mayorista',
+                    precio: parseFloat(precio) || 0,
+                    stock: parseInt(stock) || 0,
+                    marca: 'incanto_mayorista'
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return res.json({ success: true, producto: data });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Listar transacciones recientes (Ventas y Compras)
+app.get('/api/mayorista/transacciones', async (req, res) => {
+    const { tipo, limite } = req.query; // tipo: 'ventas', 'compras', o all
+    const limitNum = parseInt(limite) || 30;
+
+    try {
+        let query = supabase
+            .from('ordenes')
+            .select('*')
+            .ilike('numero_orden', '#INC-MAY-%')
+            .order('id', { ascending: false })
+            .limit(limitNum);
+
+        if (tipo === 'ventas') {
+            query = query.ilike('numero_orden', '#INC-MAY-VTA-%');
+        } else if (tipo === 'compras') {
+            query = query.ilike('numero_orden', '#INC-MAY-CMP-%');
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        // Parsear datos de cada transacción
+        const transacciones = (data || []).map(t => {
+            let detalleJson = null;
+            try {
+                detalleJson = t.observaciones ? JSON.parse(t.observaciones) : null;
+            } catch (e) {
+                detalleJson = { texto: t.observaciones };
+            }
+            const esVenta = (t.numero_orden || '').includes('VTA');
+            return {
+                id: t.id,
+                numero: t.numero_orden,
+                tipo: esVenta ? 'venta' : 'compra',
+                fecha: t.fecha,
+                persona: t.cliente_nombre, // Cliente o Proveedor
+                producto: detalleJson?.producto_nombre || 'Producto',
+                cantidad: detalleJson?.cantidad || 1,
+                precio_unitario: detalleJson?.precio_unitario || 0,
+                total: parseFloat(t.total) || 0,
+                estado: t.estado,
+                vendedor: t.vendedor
+            };
+        });
+
+        res.json(transacciones);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Registrar Venta Mayorista: Cliente, Producto, Cantidad, Importe
+// Resta stock del producto en 'incanto_mayorista'
+app.post('/api/mayorista/ventas', async (req, res) => {
+    const { cliente, producto_id, producto_nombre, cantidad, importe, vendedor } = req.body;
+    const cantNum = parseInt(cantidad) || 1;
+    const totalNum = parseFloat(importe) || 0;
+    const nombreProd = (producto_nombre || '').trim();
+
+    if (!cliente || !nombreProd || totalNum <= 0) {
+        return res.status(400).json({ error: 'Faltan campos obligatorios: Cliente, Producto e Importe.' });
+    }
+
+    try {
+        let prodTarget = null;
+        if (producto_id) {
+            const { data: p } = await supabase
+                .from('productos')
+                .select('*')
+                .eq('id', producto_id)
+                .eq('marca', 'incanto_mayorista')
+                .maybeSingle();
+            prodTarget = p;
+        }
+
+        // Si no se pasó ID o no se encontró, buscar por nombre exacto en mayorista o crearlo
+        if (!prodTarget) {
+            const { data: pExist } = await supabase
+                .from('productos')
+                .select('*')
+                .eq('marca', 'incanto_mayorista')
+                .ilike('nombre', nombreProd)
+                .maybeSingle();
+
+            if (pExist) {
+                prodTarget = pExist;
+            } else {
+                // Crear producto nuevo en stock mayorista
+                const codigo_sku = `MAY-${Date.now().toString().slice(-6)}`;
+                const { data: pNew, error: pErr } = await supabase
+                    .from('productos')
+                    .insert([{
+                        codigo_sku,
+                        nombre: nombreProd,
+                        variante: 'Mayorista',
+                        precio: totalNum / (cantNum || 1),
+                        stock: 0,
+                        marca: 'incanto_mayorista'
+                    }])
+                    .select()
+                    .single();
+                if (pErr) throw pErr;
+                prodTarget = pNew;
+            }
+        }
+
+        // Descontar stock (no menor a 0)
+        const nuevoStock = Math.max(0, (prodTarget.stock || 0) - cantNum);
+        await supabase
+            .from('productos')
+            .update({ stock: nuevoStock })
+            .eq('id', prodTarget.id);
+
+        // Generar número de venta mayorista único
+        const numVenta = `#INC-MAY-VTA-${Date.now().toString().slice(-6)}`;
+        const fechaHoy = new Date().toISOString().split('T')[0];
+
+        const detalleObj = {
+            tipo: 'venta_mayorista',
+            producto_id: prodTarget.id,
+            producto_nombre: prodTarget.nombre,
+            cantidad: cantNum,
+            precio_unitario: totalNum / cantNum
+        };
+
+        const { data: orden, error: errOrden } = await supabase
+            .from('ordenes')
+            .insert([{
+                numero_orden: numVenta,
+                fecha: fechaHoy,
+                vendedor: vendedor || 'sistema',
+                cliente_nombre: cliente.trim(),
+                total: totalNum,
+                estado: 'Finalizado',
+                modo_entrega: 'Mayorista',
+                observaciones: JSON.stringify(detalleObj)
+            }])
+            .select()
+            .single();
+
+        if (errOrden) throw errOrden;
+
+        res.json({
+            success: true,
+            numero: numVenta,
+            stockRestante: nuevoStock,
+            orden
+        });
+    } catch (err) {
+        console.error('Error al registrar venta mayorista:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Registrar Compra Mayorista: Proveedor, Producto, Cantidad, Importe
+// Suma stock al producto en 'incanto_mayorista'
+app.post('/api/mayorista/compras', async (req, res) => {
+    const { proveedor, producto_id, producto_nombre, cantidad, importe, vendedor } = req.body;
+    const cantNum = parseInt(cantidad) || 1;
+    const totalNum = parseFloat(importe) || 0;
+    const nombreProd = (producto_nombre || '').trim();
+
+    if (!proveedor || !nombreProd || totalNum <= 0) {
+        return res.status(400).json({ error: 'Faltan campos obligatorios: Proveedor, Producto e Importe.' });
+    }
+
+    try {
+        let prodTarget = null;
+        if (producto_id) {
+            const { data: p } = await supabase
+                .from('productos')
+                .select('*')
+                .eq('id', producto_id)
+                .eq('marca', 'incanto_mayorista')
+                .maybeSingle();
+            prodTarget = p;
+        }
+
+        if (!prodTarget) {
+            const { data: pExist } = await supabase
+                .from('productos')
+                .select('*')
+                .eq('marca', 'incanto_mayorista')
+                .ilike('nombre', nombreProd)
+                .maybeSingle();
+
+            if (pExist) {
+                prodTarget = pExist;
+            } else {
+                // Crear producto nuevo en stock mayorista
+                const codigo_sku = `MAY-${Date.now().toString().slice(-6)}`;
+                const { data: pNew, error: pErr } = await supabase
+                    .from('productos')
+                    .insert([{
+                        codigo_sku,
+                        nombre: nombreProd,
+                        variante: 'Mayorista',
+                        precio: totalNum / (cantNum || 1),
+                        stock: cantNum,
+                        marca: 'incanto_mayorista'
+                    }])
+                    .select()
+                    .single();
+                if (pErr) throw pErr;
+                prodTarget = pNew;
+            }
+        }
+
+        // Si ya existía, sumar stock
+        if (prodTarget && prodTarget.id) {
+            const nuevoStock = (parseInt(prodTarget.stock) || 0) + cantNum;
+            // Actualizar stock y mantener o actualizar precio de referencia
+            await supabase
+                .from('productos')
+                .update({ 
+                    stock: nuevoStock,
+                    precio: prodTarget.precio > 0 ? prodTarget.precio : (totalNum / cantNum)
+                })
+                .eq('id', prodTarget.id);
+            prodTarget.stock = nuevoStock;
+        }
+
+        // Generar número de compra mayorista único
+        const numCompra = `#INC-MAY-CMP-${Date.now().toString().slice(-6)}`;
+        const fechaHoy = new Date().toISOString().split('T')[0];
+
+        const detalleObj = {
+            tipo: 'compra_mayorista',
+            producto_id: prodTarget.id,
+            producto_nombre: prodTarget.nombre,
+            cantidad: cantNum,
+            precio_unitario: totalNum / cantNum
+        };
+
+        const { data: orden, error: errOrden } = await supabase
+            .from('ordenes')
+            .insert([{
+                numero_orden: numCompra,
+                fecha: fechaHoy,
+                vendedor: vendedor || 'sistema',
+                cliente_nombre: proveedor.trim(), // Se guarda el nombre del proveedor en cliente_nombre
+                total: totalNum,
+                estado: 'Finalizado',
+                modo_entrega: 'Compra',
+                observaciones: JSON.stringify(detalleObj)
+            }])
+            .select()
+            .single();
+
+        if (errOrden) throw errOrden;
+
+        res.json({
+            success: true,
+            numero: numCompra,
+            stockActual: prodTarget.stock,
+            orden
+        });
+    } catch (err) {
+        console.error('Error al registrar compra mayorista:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ==========================================
 
 // Obtener permisos del usuario logueado para la marca actual

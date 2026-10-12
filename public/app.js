@@ -193,6 +193,19 @@ function aplicarPermisosEnUI() {
         else bottomNavUsuarios.classList.add('hidden');
     }
 
+    // 6. Botón Incanto Mayorista (SOLO para Incanto)
+    const esIncanto = MARCA_ACTUAL === 'incanto';
+    const sideNavMayorista = document.getElementById('sideNavMayorista');
+    const bottomNavMayorista = document.getElementById('bottomNavMayorista');
+    if (sideNavMayorista) {
+        if (esIncanto) sideNavMayorista.classList.remove('hidden');
+        else sideNavMayorista.classList.add('hidden');
+    }
+    if (bottomNavMayorista) {
+        if (esIncanto) bottomNavMayorista.classList.remove('hidden');
+        else bottomNavMayorista.classList.add('hidden');
+    }
+
     // Si el usuario no tiene permiso para la sección inicial ('nueva'), cambiar a 'busqueda'
     if (!puedeNueva && puedeBusqueda && SECCION_ACTUAL === 'nueva') {
         cambiarSeccion('busqueda');
@@ -226,6 +239,16 @@ async function cargarMetricasHoy() {
 // ==========================================
 // UTILIDADES (Debounce & Formateo)
 // ==========================================
+function escapeHtml(texto) {
+    if (!texto) return '';
+    return String(texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function debounce(func, wait) {
     let timeout;
     return function(...args) {
@@ -674,12 +697,15 @@ function cambiarSeccion(seccion) {
     SECCION_ACTUAL = seccion;
     const secNueva = document.getElementById('seccionNuevaOrden');
     const secBusqueda = document.getElementById('seccionBusquedaOrdenes');
+    const secMayorista = document.getElementById('seccionMayorista');
 
     const sideNueva = document.getElementById('sideNavNueva');
     const sideBusqueda = document.getElementById('sideNavBusqueda');
+    const sideMayorista = document.getElementById('sideNavMayorista');
 
     const bNavNueva = document.getElementById('bottomNavNueva');
     const bNavBusqueda = document.getElementById('bottomNavBusqueda');
+    const bNavMayorista = document.getElementById('bottomNavMayorista');
 
     const esIncanto = MARCA_ACTUAL === 'incanto';
     const bgActivo = esIncanto ? 'bg-rose-600' : 'bg-sky-600';
@@ -688,6 +714,7 @@ function cambiarSeccion(seccion) {
     if (seccion === 'nueva') {
         if (secNueva) secNueva.classList.remove('hidden');
         if (secBusqueda) secBusqueda.classList.add('hidden');
+        if (secMayorista) secMayorista.classList.add('hidden');
 
         // Menú Lateral Desktop
         if (sideNueva) {
@@ -695,6 +722,9 @@ function cambiarSeccion(seccion) {
         }
         if (sideBusqueda) {
             sideBusqueda.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
+        }
+        if (sideMayorista) {
+            sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40";
         }
 
         // Barra Móvil
@@ -704,11 +734,15 @@ function cambiarSeccion(seccion) {
         if (bNavBusqueda) {
             bNavBusqueda.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
         }
+        if (bNavMayorista) {
+            bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-pink-400";
+        }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (seccion === 'busqueda') {
         if (secNueva) secNueva.classList.add('hidden');
         if (secBusqueda) secBusqueda.classList.remove('hidden');
+        if (secMayorista) secMayorista.classList.add('hidden');
 
         // Menú Lateral Desktop
         if (sideNueva) {
@@ -716,6 +750,9 @@ function cambiarSeccion(seccion) {
         }
         if (sideBusqueda) {
             sideBusqueda.className = `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg`;
+        }
+        if (sideMayorista) {
+            sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40";
         }
 
         // Barra Móvil
@@ -725,9 +762,41 @@ function cambiarSeccion(seccion) {
         if (bNavBusqueda) {
             bNavBusqueda.className = `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo}`;
         }
+        if (bNavMayorista) {
+            bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-pink-400";
+        }
 
         // Si la lista está vacía o es la primera vez que se entra, buscar órdenes
         ejecutarBusquedaAvanzada();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (seccion === 'mayorista') {
+        if (secNueva) secNueva.classList.add('hidden');
+        if (secBusqueda) secBusqueda.classList.add('hidden');
+        if (secMayorista) secMayorista.classList.remove('hidden');
+
+        // Menú Lateral Desktop
+        if (sideNueva) {
+            sideNueva.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
+        }
+        if (sideBusqueda) {
+            sideBusqueda.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
+        }
+        if (sideMayorista) {
+            sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition bg-pink-600 text-white shadow-lg";
+        }
+
+        // Barra Móvil
+        if (bNavNueva) {
+            bNavNueva.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
+        }
+        if (bNavBusqueda) {
+            bNavBusqueda.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
+        }
+        if (bNavMayorista) {
+            bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-pink-400 font-bold";
+        }
+
+        inicializarModuloMayorista();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
@@ -1883,5 +1952,333 @@ async function eliminarUsuario(username) {
         }
     } catch (err) {
         showToast('Error de conexión al eliminar usuario.', 'error');
+    }
+}
+
+// ==========================================
+// MÓDULO INCANTO MAYORISTA (JS)
+// ==========================================
+let cotizacionDolarMep = 1540;
+let modoMonedaMayorista = 'ARS'; // 'ARS' o 'USD'
+let metricasMayoristaMemoria = { ventasMes: 0, cantidadSplash: 0, valorEstimado: 0 };
+let productosMayoristaMemoria = [];
+
+async function inicializarModuloMayorista() {
+    await cargarCotizacionMep();
+    await cargarMetricasMayorista();
+    await cargarProductosMayorista();
+    await cargarTransaccionesMayorista();
+}
+
+// Cargar Dólar MEP
+async function cargarCotizacionMep(forzarAlerta = false) {
+    const display = document.getElementById('valorDolarMepDisplay');
+    try {
+        const res = await fetch('/api/dolar/mep');
+        const data = await res.json();
+        cotizacionDolarMep = parseFloat(data.venta || data.mep) || 1540;
+        if (display) {
+            display.textContent = `$${cotizacionDolarMep.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+        if (forzarAlerta) {
+            showToast(`Cotización MEP actualizada: $${cotizacionDolarMep.toFixed(2)}`, 'info');
+            actualizarValorEstimadoDisplay();
+        }
+    } catch (err) {
+        console.error('Error al obtener MEP:', err);
+        if (display) display.textContent = `$${cotizacionDolarMep.toFixed(2)}`;
+    }
+}
+
+// Cargar Métricas (Ventas del mes, Cantidad Splash, Valor estimado)
+async function cargarMetricasMayorista() {
+    try {
+        const res = await fetch('/api/mayorista/metricas');
+        const data = await res.json();
+        metricasMayoristaMemoria = data || { ventasMes: 0, cantidadSplash: 0, valorEstimado: 0 };
+
+        // 1. Ventas del mes
+        const elVentas = document.getElementById('kpiMayoristaVentasMes');
+        if (elVentas) {
+            elVentas.textContent = `$${(parseFloat(data.ventasMes) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        // 2. Cantidad de Splash
+        const elSplash = document.getElementById('kpiMayoristaSplash');
+        if (elSplash) {
+            elSplash.textContent = `${data.cantidadSplash || 0} un.`;
+        }
+
+        // 3. Valor estimado ($ / u$d)
+        actualizarValorEstimadoDisplay();
+    } catch (err) {
+        console.error('Error al cargar métricas mayorista:', err);
+    }
+}
+
+// Alternar entre $ y u$d con el botón de flechitas ⇄
+function alternarMonedaMayorista() {
+    modoMonedaMayorista = (modoMonedaMayorista === 'ARS') ? 'USD' : 'ARS';
+    actualizarValorEstimadoDisplay();
+}
+
+function actualizarValorEstimadoDisplay() {
+    const label = document.getElementById('kpiMayoristaValorLabel');
+    const monto = document.getElementById('kpiMayoristaValorMonto');
+    const sub = document.getElementById('kpiMayoristaValorSub');
+    if (!label || !monto) return;
+
+    const valorArs = parseFloat(metricasMayoristaMemoria.valorEstimado) || 0;
+
+    if (modoMonedaMayorista === 'ARS') {
+        label.textContent = 'Valor estimado en $';
+        monto.textContent = `$${valorArs.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (sub) sub.textContent = 'Inventario mayorista total';
+    } else {
+        const mepVal = cotizacionDolarMep > 0 ? cotizacionDolarMep : 1540;
+        const valorUsd = valorArs / mepVal;
+        label.textContent = 'Valor estimado en u$d';
+        monto.textContent = `u$d ${valorUsd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        if (sub) sub.textContent = `Cotización MEP: $${mepVal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+    }
+}
+
+// Catálogo propio de productos mayorista
+async function cargarProductosMayorista() {
+    try {
+        const res = await fetch('/api/mayorista/productos');
+        const data = await res.json();
+        productosMayoristaMemoria = data || [];
+    } catch (err) {
+        console.error('Error al cargar catálogo mayorista:', err);
+    }
+}
+
+// Autocompletado de productos para Ventas y Compras
+function filtrarProductosMayorista(tipo, texto) {
+    const query = (texto || '').toLowerCase().trim();
+    const contenedorId = tipo === 'venta' ? 'sugerenciasMayVenta' : 'sugerenciasMayCompra';
+    const container = document.getElementById(contenedorId);
+    if (!container) return;
+
+    // Resetear ID seleccionado al tipear
+    const hiddenId = tipo === 'venta' ? document.getElementById('mayVentaProductoId') : document.getElementById('mayCompraProductoId');
+    if (hiddenId) hiddenId.value = '';
+
+    if (!query) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    const coincidencias = productosMayoristaMemoria.filter(p =>
+        (p.nombre || '').toLowerCase().includes(query) || (p.codigo_sku || '').toLowerCase().includes(query)
+    );
+
+    if (coincidencias.length === 0) {
+        container.innerHTML = `
+            <div class="p-2.5 text-xs text-slate-400 italic">
+                Nuevo producto: se registrará en el stock mayorista.
+            </div>
+        `;
+        container.classList.remove('hidden');
+        return;
+    }
+
+    container.innerHTML = coincidencias.map(p => `
+        <div onclick="seleccionarProductoMayorista('${tipo}', ${p.id}, '${escapeHtml(p.nombre)}', ${p.precio || 0}, ${p.stock || 0})" class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 last:border-b-0 flex justify-between items-center text-xs">
+            <div>
+                <strong class="text-white block">${escapeHtml(p.nombre)}</strong>
+                <span class="text-[10px] text-slate-400">Stock: <span class="text-pink-400 font-bold">${p.stock} un.</span></span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs font-bold text-emerald-400">$${(parseFloat(p.precio) || 0).toFixed(2)}</span>
+            </div>
+        </div>
+    `).join('');
+    container.classList.remove('hidden');
+}
+
+function seleccionarProductoMayorista(tipo, id, nombre, precio, stock) {
+    const inputNombre = tipo === 'venta' ? document.getElementById('mayVentaProducto') : document.getElementById('mayCompraProducto');
+    const inputId = tipo === 'venta' ? document.getElementById('mayVentaProductoId') : document.getElementById('mayCompraProductoId');
+    const inputCant = tipo === 'venta' ? document.getElementById('mayVentaCantidad') : document.getElementById('mayCompraCantidad');
+    const inputImporte = tipo === 'venta' ? document.getElementById('mayVentaImporte') : document.getElementById('mayCompraImporte');
+    const contenedorId = tipo === 'venta' ? 'sugerenciasMayVenta' : 'sugerenciasMayCompra';
+
+    if (inputNombre) inputNombre.value = nombre;
+    if (inputId) inputId.value = id;
+
+    // Calcular importe automático si hay precio
+    const cant = parseInt(inputCant?.value) || 1;
+    if (inputImporte && precio > 0) {
+        inputImporte.value = (precio * cant).toFixed(2);
+    }
+
+    document.getElementById(contenedorId)?.classList.add('hidden');
+}
+
+// Registrar Venta Mayorista
+async function guardarVentaMayorista(e) {
+    e.preventDefault();
+    const cliente = document.getElementById('mayVentaCliente').value.trim();
+    const producto_nombre = document.getElementById('mayVentaProducto').value.trim();
+    const producto_id = document.getElementById('mayVentaProductoId').value;
+    const cantidad = parseInt(document.getElementById('mayVentaCantidad').value) || 1;
+    const importe = parseFloat(document.getElementById('mayVentaImporte').value) || 0;
+
+    if (!cliente || !producto_nombre || importe <= 0) {
+        showToast('Completá todos los campos de la venta.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnGuardarVentaMay');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/mayorista/ventas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cliente,
+                producto_id: producto_id || null,
+                producto_nombre,
+                cantidad,
+                importe,
+                vendedor: USUARIO_ACTUAL
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast(`¡Venta Mayorista ${data.numero} registrada con éxito!`, 'success');
+            document.getElementById('formVentaMayorista').reset();
+            document.getElementById('mayVentaProductoId').value = '';
+            document.getElementById('mayVentaCantidad').value = 1;
+            // Recargar datos
+            await cargarMetricasMayorista();
+            await cargarProductosMayorista();
+            await cargarTransaccionesMayorista();
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo guardar la venta'), 'error');
+        }
+    } catch (err) {
+        showToast('Error de red al registrar venta.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Registrar Compra Mayorista
+async function guardarCompraMayorista(e) {
+    e.preventDefault();
+    const proveedor = document.getElementById('mayCompraProveedor').value.trim();
+    const producto_nombre = document.getElementById('mayCompraProducto').value.trim();
+    const producto_id = document.getElementById('mayCompraProductoId').value;
+    const cantidad = parseInt(document.getElementById('mayCompraCantidad').value) || 1;
+    const importe = parseFloat(document.getElementById('mayCompraImporte').value) || 0;
+
+    if (!proveedor || !producto_nombre || importe <= 0) {
+        showToast('Completá todos los campos de la compra.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnGuardarCompraMay');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/mayorista/compras', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                proveedor,
+                producto_id: producto_id || null,
+                producto_nombre,
+                cantidad,
+                importe,
+                vendedor: USUARIO_ACTUAL
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast(`¡Compra Mayorista ${data.numero} registrada con éxito!`, 'success');
+            document.getElementById('formCompraMayorista').reset();
+            document.getElementById('mayCompraProductoId').value = '';
+            document.getElementById('mayCompraCantidad').value = 1;
+            // Recargar datos
+            await cargarMetricasMayorista();
+            await cargarProductosMayorista();
+            await cargarTransaccionesMayorista();
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo registrar compra'), 'error');
+        }
+    } catch (err) {
+        showToast('Error de red al registrar compra.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Cargar y mostrar historial de Ventas y Compras
+async function cargarTransaccionesMayorista() {
+    const listVentas = document.getElementById('listaVentasMayorista');
+    const listCompras = document.getElementById('listaComprasMayorista');
+
+    try {
+        const res = await fetch('/api/mayorista/transacciones?limite=30');
+        const data = await res.json();
+
+        const ventas = (data || []).filter(t => t.tipo === 'venta');
+        const compras = (data || []).filter(t => t.tipo === 'compra');
+
+        if (listVentas) {
+            if (ventas.length === 0) {
+                listVentas.innerHTML = '<p class="text-xs text-slate-400 italic text-center p-3">No hay ventas registradas aún.</p>';
+            } else {
+                listVentas.innerHTML = ventas.map(v => `
+                    <div class="bg-slate-900/80 border border-slate-700/70 p-2.5 rounded-xl flex items-center justify-between text-xs hover:border-rose-500/40 transition">
+                        <div class="space-y-0.5">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-white">${escapeHtml(v.persona || 'Cliente')}</span>
+                                <span class="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">${v.numero}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400">
+                                📦 ${escapeHtml(v.producto)} • <strong>${v.cantidad} un.</strong> • ${formatearFechaVista(v.fecha)}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs sm:text-sm font-black text-rose-400">+$${(parseFloat(v.total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                            <span class="text-[9px] text-slate-500">${v.vendedor || 'sistema'}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        if (listCompras) {
+            if (compras.length === 0) {
+                listCompras.innerHTML = '<p class="text-xs text-slate-400 italic text-center p-3">No hay compras registradas aún.</p>';
+            } else {
+                listCompras.innerHTML = compras.map(c => `
+                    <div class="bg-slate-900/80 border border-slate-700/70 p-2.5 rounded-xl flex items-center justify-between text-xs hover:border-emerald-500/40 transition">
+                        <div class="space-y-0.5">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-white">${escapeHtml(c.persona || 'Proveedor')}</span>
+                                <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">${c.numero}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400">
+                                📥 ${escapeHtml(c.producto)} • <strong>${c.cantidad} un.</strong> • ${formatearFechaVista(c.fecha)}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs sm:text-sm font-black text-emerald-400">-$${(parseFloat(c.total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                            <span class="text-[9px] text-slate-500">${c.vendedor || 'sistema'}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch (err) {
+        console.error('Error al cargar transacciones:', err);
     }
 }

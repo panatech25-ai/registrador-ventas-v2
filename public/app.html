@@ -77,6 +77,12 @@
                     <span>Informes</span>
                 </button>
 
+                <!-- Botón Incanto Mayorista (Solo en Incanto) -->
+                <button id="sideNavMayorista" type="button" onclick="cambiarSeccion('mayorista')" class="hidden w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40">
+                    <span class="text-base">💎</span>
+                    <span>Incanto Mayorista</span>
+                </button>
+
                 <!-- Botón Usuarios (Solo npanadisi) -->
                 <button id="btnMenuUsuarios" type="button" onclick="abrirModalUsuarios()" class="hidden w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-violet-300 hover:bg-slate-700/70 transition border border-violet-500/40 bg-violet-950/40">
                     <span class="text-base">👥</span>
@@ -396,7 +402,223 @@
             </div>
         </section>
 
-    </main>
+        <!-- ======================================================== -->
+        <!-- SECCIÓN 3: INCANTO MAYORISTA (Solo para Incanto)          -->
+        <!-- ======================================================== -->
+        <section id="seccionMayorista" class="hidden space-y-5">
+                
+                <!-- Encabezado del Módulo Mayorista -->
+                <div class="bg-gradient-to-r from-pink-950/70 via-slate-900 to-purple-950/70 border border-pink-500/30 p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-2xl shadow-inner">
+                            💎
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-base sm:text-xl font-black text-pink-400 tracking-wide uppercase">Incanto Mayorista</h2>
+                                <span class="bg-pink-500/20 border border-pink-500/40 text-pink-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Stock Separado</span>
+                            </div>
+                            <p class="text-xs text-slate-400">Control de compras, ventas y cotización MEP en tiempo real</p>
+                        </div>
+                    </div>
+
+                    <!-- Cotización MEP en vivo -->
+                    <div class="bg-slate-900/90 border border-slate-700/80 px-3 py-2 rounded-xl flex items-center gap-3 shadow-md self-stretch sm:self-auto justify-between sm:justify-start">
+                        <div class="text-left">
+                            <span class="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">Dólar MEP (Bolsa)</span>
+                            <span id="valorDolarMepDisplay" class="text-xs sm:text-sm font-black text-emerald-400">Cargando...</span>
+                        </div>
+                        <button type="button" onclick="cargarCotizacionMep(true)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition" title="Actualizar cotización">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 1. TARJETAS KPI (Ventas del mes, Cantidad Splash, Valor estimado $ / u$d) -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                    
+                    <!-- Tarjeta 1: Ventas del mes -->
+                    <div class="bg-slate-800/80 border border-slate-700/70 p-4 rounded-2xl shadow-lg flex items-center gap-3.5">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-2xl flex-shrink-0">
+                            💰
+                        </div>
+                        <div class="overflow-hidden">
+                            <span class="block text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ventas del Mes</span>
+                            <span id="kpiMayoristaVentasMes" class="text-lg sm:text-2xl font-black text-emerald-400 tracking-tight">$0.00</span>
+                            <span class="block text-[10px] text-slate-500 mt-0.5">Órdenes mayoristas del mes</span>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 2: Cantidad de Splash -->
+                    <div class="bg-slate-800/80 border border-slate-700/70 p-4 rounded-2xl shadow-lg flex items-center gap-3.5">
+                        <div class="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/30 text-pink-400 flex items-center justify-center text-2xl flex-shrink-0">
+                            ✨
+                        </div>
+                        <div class="overflow-hidden">
+                            <span class="block text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cantidad de Splash</span>
+                            <span id="kpiMayoristaSplash" class="text-lg sm:text-2xl font-black text-pink-400 tracking-tight">0 un.</span>
+                            <span class="block text-[10px] text-slate-500 mt-0.5">Stock disponible en catálogo mayorista</span>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta 3: Valor estimado con botón de flechitas ⇄ para alternar $ y u$d -->
+                    <div class="bg-slate-800/80 border border-slate-700/70 p-4 rounded-2xl shadow-lg flex items-center justify-between gap-3 relative overflow-hidden">
+                        <div class="flex items-center gap-3.5 overflow-hidden">
+                            <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center text-2xl flex-shrink-0">
+                                💵
+                            </div>
+                            <div class="overflow-hidden">
+                                <span id="kpiMayoristaValorLabel" class="block text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                    Valor estimado en $
+                                </span>
+                                <span id="kpiMayoristaValorMonto" class="text-lg sm:text-2xl font-black text-sky-400 tracking-tight">
+                                    $0.00
+                                </span>
+                                <span id="kpiMayoristaValorSub" class="block text-[10px] text-slate-500 mt-0.5">
+                                    Inventario mayorista total
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Botón flechitas para cambiar a u$d / $ -->
+                        <button type="button" id="btnToggleMonedaMayorista" onclick="alternarMonedaMayorista()" class="bg-slate-900/90 hover:bg-slate-700 text-sky-300 hover:text-white border border-sky-500/30 hover:border-sky-400 p-2.5 rounded-xl text-sm font-bold shadow-md transition active:scale-95 flex flex-col items-center justify-center flex-shrink-0" title="Cambiar a u$d / $ (Dólar MEP)">
+                            <span class="text-base">⇄</span>
+                            <span class="text-[9px] uppercase font-bold mt-0.5">u$d / $</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. SECCIÓN VENTAS MAYORISTAS -->
+                <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/80 pb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🛍️</span>
+                            <div>
+                                <h3 class="text-sm sm:text-base font-bold text-rose-400 uppercase tracking-wider">Cargar Venta Mayorista</h3>
+                                <p class="text-[11px] text-slate-400">Registrá la salida y restá unidades del stock mayorista</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700 self-start sm:self-auto">
+                            Resta del stock mayorista
+                        </span>
+                    </div>
+
+                    <form id="formVentaMayorista" onsubmit="guardarVentaMayorista(event)" class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <!-- Cliente -->
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cliente *</label>
+                                <input type="text" id="mayVentaCliente" placeholder="Nombre del cliente mayorista" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
+                            </div>
+
+                            <!-- Producto (Con autocompletado o nuevo) -->
+                            <div class="relative">
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Producto *</label>
+                                <input type="text" id="mayVentaProducto" placeholder="Ej: Pure Seduction Splash" required autocomplete="off" oninput="filtrarProductosMayorista('venta', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <input type="hidden" id="mayVentaProductoId">
+                                <!-- Sugerencias de productos mayorista -->
+                                <div id="sugerenciasMayVenta" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto"></div>
+                            </div>
+
+                            <!-- Cantidad -->
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cantidad *</label>
+                                <input type="number" id="mayVentaCantidad" min="1" value="1" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
+                            </div>
+
+                            <!-- Importe -->
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Importe Total ($) *</label>
+                                <input type="number" step="0.01" id="mayVentaImporte" placeholder="0.00" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-1">
+                            <button type="submit" id="btnGuardarVentaMay" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 px-6 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                                💾 <span>Registrar Venta</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Historial reciente de Ventas -->
+                    <div class="pt-3 border-t border-slate-800">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Últimas Ventas Mayoristas</span>
+                            <button type="button" onclick="cargarTransaccionesMayorista()" class="text-[11px] text-rose-400 hover:underline">Actualizar</button>
+                        </div>
+                        <div id="listaVentasMayorista" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                            <p class="text-xs text-slate-400 italic text-center p-3">Cargando ventas...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. SECCIÓN COMPRAS MAYORISTAS -->
+                <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/80 pb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">📥</span>
+                            <div>
+                                <h3 class="text-sm sm:text-base font-bold text-emerald-400 uppercase tracking-wider">Cargar Compra Mayorista</h3>
+                                <p class="text-[11px] text-slate-400">Ingresá productos adquiridos a proveedores y sumá al stock</p>
+                            </div>
+                        </div>
+                        <span class="text-[10px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700 self-start sm:self-auto">
+                            Suma al stock mayorista
+                        </span>
+                    </div>
+
+                    <form id="formCompraMayorista" onsubmit="guardarCompraMayorista(event)" class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <!-- Proveedor -->
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Proveedor *</label>
+                                <input type="text" id="mayCompraProveedor" placeholder="Nombre del proveedor" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+
+                            <!-- Producto -->
+                            <div class="relative">
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Producto *</label>
+                                <input type="text" id="mayCompraProducto" placeholder="Ej: Pure Seduction Splash" required autocomplete="off" oninput="filtrarProductosMayorista('compra', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                <input type="hidden" id="mayCompraProductoId">
+                                <!-- Sugerencias de productos mayorista -->
+                                <div id="sugerenciasMayCompra" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto"></div>
+                            </div>
+
+                            <!-- Cantidad -->
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cantidad *</label>
+                                <input type="number" id="mayCompraCantidad" min="1" value="1" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+
+                            <!-- Importe -->
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Importe Total ($) *</label>
+                                <input type="number" step="0.01" id="mayCompraImporte" placeholder="0.00" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-1">
+                            <button type="submit" id="btnGuardarCompraMay" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 px-6 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
+                                📥 <span>Registrar Compra</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Historial reciente de Compras -->
+                    <div class="pt-3 border-t border-slate-800">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Últimas Compras Mayoristas</span>
+                            <button type="button" onclick="cargarTransaccionesMayorista()" class="text-[11px] text-emerald-400 hover:underline">Actualizar</button>
+                        </div>
+                        <div id="listaComprasMayorista" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                            <p class="text-xs text-slate-400 italic text-center p-3">Cargando compras...</p>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
     </div>
 
     <!-- ======================================================== -->
@@ -425,6 +647,12 @@
         <button type="button" id="bottomNavInformes" onclick="abrirModalExportar()" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-emerald-400">
             <span class="text-lg">📊</span>
             <span class="text-[10px] font-bold mt-0.5">Informes</span>
+        </button>
+
+        <!-- Botón Mayorista (Solo en Incanto) -->
+        <button type="button" id="bottomNavMayorista" onclick="cambiarSeccion('mayorista')" class="hidden flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-pink-400 hover:text-pink-300">
+            <span class="text-lg">💎</span>
+            <span class="text-[10px] font-bold mt-0.5">Mayorista</span>
         </button>
 
         <!-- Botón Usuarios (Solo npanadisi) -->
