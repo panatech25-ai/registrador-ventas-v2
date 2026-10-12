@@ -67,9 +67,19 @@ function showToast(mensaje, tipo = 'success') {
 }
 
 // ==========================================
-// CONFIGURACIÓN DE MARCA UI
+// Almacenamiento local de permisos del usuario actual
+let PERMISOS_ACTUALES = {
+    nueva_orden: true,
+    busqueda: true,
+    stock: true,
+    informes: false
+};
+let ES_ADMIN = false;
+
 // ==========================================
-function configurarMarcaUI() {
+// CONFIGURACIÓN DE MARCA Y PERMISOS UI
+// ==========================================
+async function configurarMarcaUI() {
     const esIncanto = MARCA_ACTUAL === 'incanto';
     const logoImg = document.getElementById('brandLogo');
     const title = document.getElementById('brandTitle');
@@ -109,36 +119,88 @@ function configurarMarcaUI() {
         }
     }
 
-    // Permisos exclusivos para menú de Informes:
-    // Panatech -> Solo npanadisi
-    // Incanto  -> Solo bprimo
-    const btnInformes = document.getElementById('btnMenuInformes');
-    const bottomNavInformes = document.getElementById('bottomNavInformes');
-    const tienePermiso = usuarioTienePermisoInformes();
+    // Cargar permisos del servidor para este usuario y marca
+    await cargarPermisosUsuario();
+}
 
-    if (btnInformes) {
-        if (tienePermiso) {
-            btnInformes.classList.remove('hidden');
-        } else {
-            btnInformes.classList.add('hidden');
+async function cargarPermisosUsuario() {
+    const user = (USUARIO_ACTUAL || '').toLowerCase().trim();
+    ES_ADMIN = (user === 'npanadisi');
+
+    try {
+        const res = await fetch(`/api/permisos/mis-permisos?usuario=${encodeURIComponent(USUARIO_ACTUAL)}&marca=${MARCA_ACTUAL}`);
+        if (res.ok) {
+            const data = await res.json();
+            PERMISOS_ACTUALES = data.permisos || {};
+            ES_ADMIN = !!data.esAdmin;
+        } else if (ES_ADMIN) {
+            PERMISOS_ACTUALES = { nueva_orden: true, busqueda: true, stock: true, informes: true };
+        }
+    } catch (err) {
+        console.error('Error al cargar permisos:', err);
+        if (ES_ADMIN) {
+            PERMISOS_ACTUALES = { nueva_orden: true, busqueda: true, stock: true, informes: true };
         }
     }
 
+    aplicarPermisosEnUI();
+}
+
+function aplicarPermisosEnUI() {
+    // 1. Botón de Nueva Orden
+    const sideNavNueva = document.getElementById('sideNavNueva');
+    const bottomNavNueva = document.getElementById('bottomNavNueva');
+    const puedeNueva = ES_ADMIN || PERMISOS_ACTUALES.nueva_orden !== false;
+    if (sideNavNueva) sideNavNueva.style.display = puedeNueva ? 'flex' : 'none';
+    if (bottomNavNueva) bottomNavNueva.style.display = puedeNueva ? 'flex' : 'none';
+
+    // 2. Botón de Búsqueda
+    const sideNavBusqueda = document.getElementById('sideNavBusqueda');
+    const bottomNavBusqueda = document.getElementById('bottomNavBusqueda');
+    const puedeBusqueda = ES_ADMIN || PERMISOS_ACTUALES.busqueda !== false;
+    if (sideNavBusqueda) sideNavBusqueda.style.display = puedeBusqueda ? 'flex' : 'none';
+    if (bottomNavBusqueda) bottomNavBusqueda.style.display = puedeBusqueda ? 'flex' : 'none';
+
+    // 3. Botón de Stock / Precios
+    const sideStockBtn = document.querySelector('aside button[onclick*="abrirModalStock"]');
+    const bottomStockBtn = document.querySelector('nav button[onclick*="abrirModalStock"]');
+    const puedeStock = ES_ADMIN || PERMISOS_ACTUALES.stock !== false;
+    if (sideStockBtn) sideStockBtn.style.display = puedeStock ? 'flex' : 'none';
+    if (bottomStockBtn) bottomStockBtn.style.display = puedeStock ? 'flex' : 'none';
+
+    // 4. Botón de Informes
+    const btnInformes = document.getElementById('btnMenuInformes');
+    const bottomNavInformes = document.getElementById('bottomNavInformes');
+    const puedeInformes = ES_ADMIN || !!PERMISOS_ACTUALES.informes;
+    if (btnInformes) {
+        if (puedeInformes) btnInformes.classList.remove('hidden');
+        else btnInformes.classList.add('hidden');
+    }
     if (bottomNavInformes) {
-        if (tienePermiso) {
-            bottomNavInformes.classList.remove('hidden');
-        } else {
-            bottomNavInformes.classList.add('hidden');
-        }
+        if (puedeInformes) bottomNavInformes.classList.remove('hidden');
+        else bottomNavInformes.classList.add('hidden');
+    }
+
+    // 5. Botón de Menú Usuarios (SOLO para npanadisi)
+    const btnMenuUsuarios = document.getElementById('btnMenuUsuarios');
+    const bottomNavUsuarios = document.getElementById('bottomNavUsuarios');
+    if (btnMenuUsuarios) {
+        if (ES_ADMIN) btnMenuUsuarios.classList.remove('hidden');
+        else btnMenuUsuarios.classList.add('hidden');
+    }
+    if (bottomNavUsuarios) {
+        if (ES_ADMIN) bottomNavUsuarios.classList.remove('hidden');
+        else bottomNavUsuarios.classList.add('hidden');
+    }
+
+    // Si el usuario no tiene permiso para la sección inicial ('nueva'), cambiar a 'busqueda'
+    if (!puedeNueva && puedeBusqueda && SECCION_ACTUAL === 'nueva') {
+        cambiarSeccion('busqueda');
     }
 }
 
 function usuarioTienePermisoInformes() {
-    const user = (USUARIO_ACTUAL || '').toLowerCase().trim();
-    const brand = (MARCA_ACTUAL || '').toLowerCase().trim();
-    if (brand === 'panatech' && user === 'npanadisi') return true;
-    if (brand === 'incanto' && user === 'bprimo') return true;
-    return false;
+    return ES_ADMIN || !!PERMISOS_ACTUALES.informes;
 }
 
 // ==========================================
@@ -1536,4 +1598,284 @@ function imprimirTicketPlantilla(cliente, telefono, modo, direccion, horario, co
         </body>
         </html>
     `);
+}
+
+// ==========================================
+// MÓDULO DE GESTIÓN DE USUARIOS (Solo npanadisi)
+// ==========================================
+let listaUsuariosEnMemoria = [];
+let usuarioEnEdicion = null;
+
+function abrirModalUsuarios() {
+    if (!ES_ADMIN) {
+        showToast('Solo el administrador npanadisi puede gestionar usuarios.', 'error');
+        return;
+    }
+    document.getElementById('modalUsuarios').classList.remove('hidden');
+    cancelarEdicionUsuario();
+    cargarListaUsuarios();
+}
+
+function cerrarModalUsuarios() {
+    document.getElementById('modalUsuarios').classList.add('hidden');
+    cancelarEdicionUsuario();
+}
+
+async function cargarListaUsuarios() {
+    const container = document.getElementById('listaUsuariosContainer');
+    if (!container) return;
+    container.innerHTML = '<p class="text-xs text-slate-400 italic p-3 text-center">Cargando lista de usuarios...</p>';
+
+    try {
+        const res = await fetch(`/api/usuarios?usuario_solicitante=${encodeURIComponent(USUARIO_ACTUAL)}`);
+        if (!res.ok) throw new Error('No se pudo cargar la lista');
+
+        const usuarios = await res.json();
+        listaUsuariosEnMemoria = usuarios || [];
+
+        if (listaUsuariosEnMemoria.length === 0) {
+            container.innerHTML = '<p class="text-xs text-slate-400 italic p-3 text-center">No hay usuarios registrados.</p>';
+            return;
+        }
+
+        container.innerHTML = listaUsuariosEnMemoria.map(u => {
+            const esEsteAdmin = (u.username || '').toLowerCase() === 'npanadisi';
+            
+            // Resumen de permisos Panatech
+            const panaHabilitado = u.panatech && u.panatech.habilitado;
+            const panaPermisos = [];
+            if (panaHabilitado) {
+                if (u.panatech.permisos?.nueva_orden) panaPermisos.push('Nueva');
+                if (u.panatech.permisos?.busqueda) panaPermisos.push('Buscar');
+                if (u.panatech.permisos?.stock) panaPermisos.push('Stock');
+                if (u.panatech.permisos?.informes) panaPermisos.push('Informes');
+            }
+
+            // Resumen de permisos Incanto
+            const incaHabilitado = u.incanto && u.incanto.habilitado;
+            const incaPermisos = [];
+            if (incaHabilitado) {
+                if (u.incanto.permisos?.nueva_orden) incaPermisos.push('Nueva');
+                if (u.incanto.permisos?.busqueda) incaPermisos.push('Buscar');
+                if (u.incanto.permisos?.stock) incaPermisos.push('Stock');
+                if (u.incanto.permisos?.informes) incaPermisos.push('Informes');
+            }
+
+            return `
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-black text-white">👤 ${u.username}</span>
+                            ${esEsteAdmin ? '<span class="text-[9px] bg-violet-900/60 text-violet-300 border border-violet-600/40 px-2 py-0.5 rounded-full font-bold">Admin</span>' : ''}
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-[10px]">
+                            <!-- Panatech pill -->
+                            <span class="px-2 py-0.5 rounded-md font-semibold ${panaHabilitado ? 'bg-sky-950 text-sky-300 border border-sky-600/30' : 'bg-slate-800 text-slate-500 line-through'}">
+                                🔵 Panatech: ${panaHabilitado ? panaPermisos.join(', ') || 'Sin menús' : 'Deshabilitado'}
+                            </span>
+                            <!-- Incanto pill -->
+                            <span class="px-2 py-0.5 rounded-md font-semibold ${incaHabilitado ? 'bg-rose-950 text-rose-300 border border-rose-600/30' : 'bg-slate-800 text-slate-500 line-through'}">
+                                🌸 Incanto: ${incaHabilitado ? incaPermisos.join(', ') || 'Sin menús' : 'Deshabilitado'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 self-end sm:self-center">
+                        <button type="button" onclick="editarUsuario('${u.username}')" class="bg-slate-800 hover:bg-slate-700 text-violet-300 px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-700 transition">
+                            ✏️ Editar
+                        </button>
+                        ${!esEsteAdmin ? `
+                            <button type="button" onclick="eliminarUsuario('${u.username}')" class="bg-rose-950/60 hover:bg-rose-900 text-rose-300 px-2.5 py-1 rounded-lg text-xs font-bold border border-rose-800/40 transition">
+                                🗑️ Eliminar
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        container.innerHTML = '<p class="text-xs text-rose-400 p-3 text-center">Error al cargar la lista de usuarios.</p>';
+    }
+}
+
+function mostrarFormularioNuevoUsuario() {
+    usuarioEnEdicion = null;
+    document.getElementById('formUsuarioTitulo').textContent = 'Crear Nuevo Usuario';
+    document.getElementById('usrUsername').value = '';
+    document.getElementById('usrUsername').removeAttribute('readonly');
+    document.getElementById('usrPassword').value = '';
+
+    // Marcar Panatech habilitado por defecto con menús básicos
+    document.getElementById('usrHabilitadoPanatech').checked = true;
+    document.getElementById('p_pana_nueva').checked = true;
+    document.getElementById('p_pana_busqueda').checked = true;
+    document.getElementById('p_pana_stock').checked = true;
+    document.getElementById('p_pana_informes').checked = false;
+
+    // Incanto deshabilitado por defecto
+    document.getElementById('usrHabilitadoIncanto').checked = false;
+    document.getElementById('p_inca_nueva').checked = false;
+    document.getElementById('p_inca_busqueda').checked = false;
+    document.getElementById('p_inca_stock').checked = false;
+    document.getElementById('p_inca_informes').checked = false;
+
+    togglePermisosMarca('panatech');
+    togglePermisosMarca('incanto');
+
+    document.getElementById('formUsuarioContainer').classList.remove('hidden');
+    document.getElementById('formUsuarioContainer').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarEdicionUsuario() {
+    usuarioEnEdicion = null;
+    const form = document.getElementById('formUsuarioContainer');
+    if (form) form.classList.add('hidden');
+}
+
+function togglePermisosMarca(marca) {
+    if (marca === 'panatech') {
+        const activo = document.getElementById('usrHabilitadoPanatech').checked;
+        const container = document.getElementById('permisosPanatechContainer');
+        if (container) {
+            container.style.opacity = activo ? '1' : '0.4';
+            container.style.pointerEvents = activo ? 'auto' : 'none';
+        }
+    } else if (marca === 'incanto') {
+        const activo = document.getElementById('usrHabilitadoIncanto').checked;
+        const container = document.getElementById('permisosIncantoContainer');
+        if (container) {
+            container.style.opacity = activo ? '1' : '0.4';
+            container.style.pointerEvents = activo ? 'auto' : 'none';
+        }
+    }
+}
+
+function editarUsuario(username) {
+    const u = listaUsuariosEnMemoria.find(x => x.username === username);
+    if (!u) return;
+
+    usuarioEnEdicion = u.username;
+    document.getElementById('formUsuarioTitulo').textContent = `Editar Usuario: ${u.username}`;
+    
+    const inputUsr = document.getElementById('usrUsername');
+    inputUsr.value = u.username;
+    if (u.username.toLowerCase() === 'npanadisi') {
+        inputUsr.setAttribute('readonly', 'true');
+    } else {
+        inputUsr.removeAttribute('readonly');
+    }
+
+    document.getElementById('usrPassword').value = u.password || '';
+
+    // Cargar Panatech
+    const panaHab = !!(u.panatech && u.panatech.habilitado);
+    document.getElementById('usrHabilitadoPanatech').checked = panaHab;
+    document.getElementById('p_pana_nueva').checked = !!u.panatech?.permisos?.nueva_orden;
+    document.getElementById('p_pana_busqueda').checked = !!u.panatech?.permisos?.busqueda;
+    document.getElementById('p_pana_stock').checked = !!u.panatech?.permisos?.stock;
+    document.getElementById('p_pana_informes').checked = !!u.panatech?.permisos?.informes;
+
+    // Cargar Incanto
+    const incaHab = !!(u.incanto && u.incanto.habilitado);
+    document.getElementById('usrHabilitadoIncanto').checked = incaHab;
+    document.getElementById('p_inca_nueva').checked = !!u.incanto?.permisos?.nueva_orden;
+    document.getElementById('p_inca_busqueda').checked = !!u.incanto?.permisos?.busqueda;
+    document.getElementById('p_inca_stock').checked = !!u.incanto?.permisos?.stock;
+    document.getElementById('p_inca_informes').checked = !!u.incanto?.permisos?.informes;
+
+    togglePermisosMarca('panatech');
+    togglePermisosMarca('incanto');
+
+    document.getElementById('formUsuarioContainer').classList.remove('hidden');
+    document.getElementById('formUsuarioContainer').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function guardarUsuarioForm() {
+    const username = document.getElementById('usrUsername').value.trim();
+    const password = document.getElementById('usrPassword').value.trim();
+
+    if (!username || !password) {
+        showToast('El usuario y la contraseña son obligatorios.', 'warning');
+        return;
+    }
+
+    const habPanatech = document.getElementById('usrHabilitadoPanatech').checked;
+    const habIncanto = document.getElementById('usrHabilitadoIncanto').checked;
+
+    if (!habPanatech && !habIncanto) {
+        showToast('Debés habilitar al menos un emprendimiento (Panatech o Incanto).', 'warning');
+        return;
+    }
+
+    const payload = {
+        usuario_solicitante: USUARIO_ACTUAL,
+        usuario: {
+            username,
+            password,
+            panatech: {
+                habilitado: habPanatech,
+                permisos: {
+                    nueva_orden: habPanatech && document.getElementById('p_pana_nueva').checked,
+                    busqueda: habPanatech && document.getElementById('p_pana_busqueda').checked,
+                    stock: habPanatech && document.getElementById('p_pana_stock').checked,
+                    informes: habPanatech && document.getElementById('p_pana_informes').checked
+                }
+            },
+            incanto: {
+                habilitado: habIncanto,
+                permisos: {
+                    nueva_orden: habIncanto && document.getElementById('p_inca_nueva').checked,
+                    busqueda: habIncanto && document.getElementById('p_inca_busqueda').checked,
+                    stock: habIncanto && document.getElementById('p_inca_stock').checked,
+                    informes: habIncanto && document.getElementById('p_inca_informes').checked
+                }
+            }
+        }
+    };
+
+    try {
+        const res = await fetch('/api/usuarios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Usuario ${username} guardado exitosamente.`, 'success');
+            cancelarEdicionUsuario();
+            cargarListaUsuarios();
+            // Si nos editamos a nosotros mismos, recargar permisos
+            if (username.toLowerCase() === (USUARIO_ACTUAL || '').toLowerCase()) {
+                cargarPermisosUsuario();
+            }
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo guardar'), 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión al guardar usuario.', 'error');
+    }
+}
+
+async function eliminarUsuario(username) {
+    if (!confirm(`¿Estás seguro de que querés eliminar al usuario "${username}"?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/usuarios/${encodeURIComponent(username)}?usuario_solicitante=${encodeURIComponent(USUARIO_ACTUAL)}`, {
+            method: 'DELETE'
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Usuario ${username} eliminado.`, 'info');
+            cancelarEdicionUsuario();
+            cargarListaUsuarios();
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo eliminar'), 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión al eliminar usuario.', 'error');
+    }
 }

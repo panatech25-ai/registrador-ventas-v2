@@ -25,18 +25,134 @@ const supabaseUrl = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim() :
 const supabaseKey = process.env.SUPABASE_KEY ? process.env.SUPABASE_KEY.trim() : '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const USUARIOS = {
-    panatech: {
-        'npanadisi': 'Asdasdasd123!',
-        'mpanadisi': 'Taxi1781!',
-        'jpanadisi': 'Taxi1781!',
-        'bprimo': 'Austra2706!'
+// Configuración por defecto de usuarios y permisos
+const USUARIOS_DEFAULT = [
+    {
+        username: 'npanadisi',
+        password: 'Asdasdasd123!',
+        panatech: {
+            habilitado: true,
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true }
+        },
+        incanto: {
+            habilitado: true,
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true }
+        }
     },
-    incanto: {
-        'npanadisi': 'Asdasdasd123',
-        'bprimo': 'Austra2706!'
+    {
+        username: 'bprimo',
+        password: 'Austra2706!',
+        panatech: {
+            habilitado: true,
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: false }
+        },
+        incanto: {
+            habilitado: true,
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true }
+        }
+    },
+    {
+        username: 'mpanadisi',
+        password: 'Taxi1781!',
+        panatech: {
+            habilitado: true,
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: false }
+        },
+        incanto: {
+            habilitado: false,
+            permisos: { nueva_orden: false, busqueda: false, stock: false, informes: false }
+        }
+    },
+    {
+        username: 'jpanadisi',
+        password: 'Taxi1781!',
+        panatech: {
+            habilitado: true,
+            permisos: { nueva_orden: true, busqueda: true, stock: true, informes: false }
+        },
+        incanto: {
+            habilitado: false,
+            permisos: { nueva_orden: false, busqueda: false, stock: false, informes: false }
+        }
     }
-};
+];
+
+// Helper para obtener y persistir usuarios en Supabase (en registro de configuración)
+let usuariosCache = null;
+let ultimaCargaUsuarios = 0;
+
+async function obtenerUsuarios() {
+    const ahora = Date.now();
+    // Cache de 15 segundos para optimizar rendimiento
+    if (usuariosCache && ahora - ultimaCargaUsuarios < 15000) {
+        return usuariosCache;
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('ordenes')
+            .select('observaciones')
+            .eq('numero_orden', 'SYS_CONFIG_USUARIOS')
+            .maybeSingle();
+
+        if (error) {
+            console.error('Error al leer usuarios de Supabase:', error.message);
+        }
+
+        if (data && data.observaciones) {
+            const parsed = JSON.parse(data.observaciones);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                usuariosCache = parsed;
+                ultimaCargaUsuarios = ahora;
+                return usuariosCache;
+            }
+        }
+    } catch (err) {
+        console.error('Error al parsear usuarios:', err);
+    }
+
+    // Si aún no existe en Supabase, inicializarlo
+    usuariosCache = USUARIOS_DEFAULT;
+    ultimaCargaUsuarios = ahora;
+    guardarUsuarios(usuariosCache).catch(() => {});
+    return usuariosCache;
+}
+
+async function guardarUsuarios(listaUsuarios) {
+    usuariosCache = listaUsuarios;
+    ultimaCargaUsuarios = Date.now();
+    const jsonStr = JSON.stringify(listaUsuarios);
+
+    try {
+        const { data: existente } = await supabase
+            .from('ordenes')
+            .select('id')
+            .eq('numero_orden', 'SYS_CONFIG_USUARIOS')
+            .maybeSingle();
+
+        if (existente && existente.id) {
+            await supabase
+                .from('ordenes')
+                .update({ observaciones: jsonStr })
+                .eq('id', existente.id);
+        } else {
+            await supabase
+                .from('ordenes')
+                .insert([{
+                    numero_orden: 'SYS_CONFIG_USUARIOS',
+                    vendedor: 'sistema',
+                    cliente_nombre: 'Configuración de Usuarios',
+                    total: 0,
+                    estado: 'Cancelado',
+                    observaciones: jsonStr
+                }]);
+        }
+        return true;
+    } catch (err) {
+        console.error('Error al guardar usuarios en Supabase:', err);
+        return false;
+    }
+}
 
 app.get('/', (req, res) => {
     res.send(`
@@ -143,15 +259,28 @@ function renderLogin(res, marca, errorMsg = null) {
 
 app.get('/login/:marca', (req, res) => renderLogin(res, req.params.marca));
 
-app.post('/login/:marca', (req, res) => {
+app.post('/login/:marca', async (req, res) => {
     const marca = req.params.marca.toLowerCase();
     const { usuario, password } = req.body;
-    const usuariosMarca = USUARIOS[marca];
+    const userTarget = (usuario || '').trim().toLowerCase();
+    
+    try {
+        const usuarios = await obtenerUsuarios();
+        const usuarioEncontrado = usuarios.find(u => (u.username || '').toLowerCase() === userTarget);
 
-    if (usuariosMarca && usuariosMarca[usuario] && usuariosMarca[usuario] === password) {
-        res.redirect(`/app.html?marca=${marca}&usuario=${encodeURIComponent(usuario)}`);
-    } else {
+        if (usuarioEncontrado && usuarioEncontrado.password === password) {
+            // Verificar si el usuario está habilitado para esta marca
+            const configMarca = usuarioEncontrado[marca];
+            if (configMarca && configMarca.habilitado) {
+                return res.redirect(`/app.html?marca=${marca}&usuario=${encodeURIComponent(usuarioEncontrado.username)}`);
+            } else {
+                return renderLogin(res, marca, `No tenés permisos para ingresar al emprendimiento ${marca.toUpperCase()}`);
+            }
+        }
+
         renderLogin(res, marca, 'Usuario o contraseña incorrectos');
+    } catch (err) {
+        renderLogin(res, marca, 'Error al procesar el inicio de sesión');
     }
 });
 
@@ -562,14 +691,150 @@ app.put('/api/ordenes/:id', async (req, res) => {
     }
 });
 
-// Función de verificación de permisos de informes:
-// - Panatech: solo npanadisi
-// - Incanto: solo bprimo
-function verificarPermisoInformes(marca, usuario) {
+// ==========================================
+// APIS GESTIÓN DE USUARIOS Y PERMISOS
+// ==========================================
+
+// Obtener permisos del usuario logueado para la marca actual
+app.get('/api/permisos/mis-permisos', async (req, res) => {
+    const { usuario, marca } = req.query;
+    const userTarget = (usuario || '').toLowerCase().trim();
+    const marcaTarget = (marca || 'panatech').toLowerCase().trim();
+
+    try {
+        const usuarios = await obtenerUsuarios();
+        const u = usuarios.find(x => (x.username || '').toLowerCase() === userTarget);
+
+        if (!u) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        const configMarca = u[marcaTarget] || { habilitado: false, permisos: {} };
+        const esAdmin = userTarget === 'npanadisi';
+
+        res.json({
+            username: u.username,
+            marca: marcaTarget,
+            habilitado: configMarca.habilitado,
+            permisos: configMarca.permisos || {},
+            esAdmin
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Listar todos los usuarios (Solo npanadisi)
+app.get('/api/usuarios', async (req, res) => {
+    const { usuario_solicitante } = req.query;
+    if ((usuario_solicitante || '').toLowerCase().trim() !== 'npanadisi') {
+        return res.status(403).json({ error: 'Solo el administrador npanadisi puede gestionar usuarios.' });
+    }
+
+    try {
+        const usuarios = await obtenerUsuarios();
+        res.json(usuarios);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Guardar / Crear / Modificar usuario (Solo npanadisi)
+app.post('/api/usuarios', async (req, res) => {
+    const { usuario_solicitante, usuario } = req.body;
+    if ((usuario_solicitante || '').toLowerCase().trim() !== 'npanadisi') {
+        return res.status(403).json({ error: 'Solo el administrador npanadisi puede gestionar usuarios.' });
+    }
+
+    if (!usuario || !usuario.username || !usuario.password) {
+        return res.status(400).json({ error: 'El nombre de usuario y la contraseña son obligatorios.' });
+    }
+
+    try {
+        const usuarios = await obtenerUsuarios();
+        const usernameNormalizado = usuario.username.trim().toLowerCase();
+        
+        const idx = usuarios.findIndex(u => (u.username || '').toLowerCase() === usernameNormalizado);
+
+        const usuarioAguardar = {
+            username: usuario.username.trim(),
+            password: usuario.password.trim(),
+            panatech: {
+                habilitado: !!(usuario.panatech && usuario.panatech.habilitado),
+                permisos: {
+                    nueva_orden: !!(usuario.panatech?.permisos?.nueva_orden),
+                    busqueda: !!(usuario.panatech?.permisos?.busqueda),
+                    stock: !!(usuario.panatech?.permisos?.stock),
+                    informes: !!(usuario.panatech?.permisos?.informes)
+                }
+            },
+            incanto: {
+                habilitado: !!(usuario.incanto && usuario.incanto.habilitado),
+                permisos: {
+                    nueva_orden: !!(usuario.incanto?.permisos?.nueva_orden),
+                    busqueda: !!(usuario.incanto?.permisos?.busqueda),
+                    stock: !!(usuario.incanto?.permisos?.stock),
+                    informes: !!(usuario.incanto?.permisos?.informes)
+                }
+            }
+        };
+
+        if (idx >= 0) {
+            usuarios[idx] = usuarioAguardar;
+        } else {
+            usuarios.push(usuarioAguardar);
+        }
+
+        const ok = await guardarUsuarios(usuarios);
+        if (!ok) throw new Error('Error al guardar en base de datos');
+
+        res.json({ success: true, usuario: usuarioAguardar });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Eliminar usuario (Solo npanadisi)
+app.delete('/api/usuarios/:username', async (req, res) => {
+    const { usuario_solicitante } = req.query;
+    const { username } = req.params;
+
+    if ((usuario_solicitante || '').toLowerCase().trim() !== 'npanadisi') {
+        return res.status(403).json({ error: 'Solo el administrador npanadisi puede gestionar usuarios.' });
+    }
+
+    if ((username || '').toLowerCase().trim() === 'npanadisi') {
+        return res.status(400).json({ error: 'No es posible eliminar al usuario administrador npanadisi.' });
+    }
+
+    try {
+        let usuarios = await obtenerUsuarios();
+        usuarios = usuarios.filter(u => (u.username || '').toLowerCase() !== (username || '').toLowerCase().trim());
+
+        const ok = await guardarUsuarios(usuarios);
+        if (!ok) throw new Error('Error al actualizar lista de usuarios');
+
+        res.json({ success: true, mensaje: 'Usuario eliminado exitosamente' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Función de verificación de permisos de informes dinámica
+async function verificarPermisoInformes(marca, usuario) {
     const user = (usuario || '').toLowerCase().trim();
     const brand = (marca || '').toLowerCase().trim();
-    if (brand === 'panatech' && user === 'npanadisi') return true;
-    if (brand === 'incanto' && user === 'bprimo') return true;
+    if (user === 'npanadisi') return true;
+
+    try {
+        const usuarios = await obtenerUsuarios();
+        const u = usuarios.find(x => (x.username || '').toLowerCase() === user);
+        if (u && u[brand] && u[brand].habilitado && u[brand].permisos) {
+            return !!u[brand].permisos.informes;
+        }
+    } catch (err) {
+        console.error('Error al verificar permiso:', err);
+    }
     return false;
 }
 
@@ -580,7 +845,8 @@ app.get('/reporte-presentacion', async (req, res) => {
     const usuarioTarget = (usuario || '').toLowerCase();
     const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
 
-    if (!verificarPermisoInformes(marcaTarget, usuarioTarget)) {
+    const tienePermiso = await verificarPermisoInformes(marcaTarget, usuarioTarget);
+    if (!tienePermiso) {
         return res.status(403).send(`
             <!DOCTYPE html>
             <html lang="es">
@@ -634,7 +900,8 @@ app.get('/api/ordenes/exportar', async (req, res) => {
     const usuarioTarget = (usuario || '').toLowerCase();
     const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
 
-    if (!verificarPermisoInformes(marcaTarget, usuarioTarget)) {
+    const tienePermiso = await verificarPermisoInformes(marcaTarget, usuarioTarget);
+    if (!tienePermiso) {
         return res.status(403).json({ error: 'Acceso restringido: No tenés permisos para exportar informes de esta marca.' });
     }
 
