@@ -1607,11 +1607,17 @@ let listaUsuariosEnMemoria = [];
 let usuarioEnEdicion = null;
 
 function abrirModalUsuarios() {
-    if (!ES_ADMIN) {
+    const user = (USUARIO_ACTUAL || '').toLowerCase().trim();
+    if (user !== 'npanadisi' && !ES_ADMIN) {
         showToast('Solo el administrador npanadisi puede gestionar usuarios.', 'error');
         return;
     }
-    document.getElementById('modalUsuarios').classList.remove('hidden');
+    const modal = document.getElementById('modalUsuarios');
+    if (!modal) {
+        console.error('Modal modalUsuarios no encontrado en el DOM');
+        return;
+    }
+    modal.classList.remove('hidden');
     cancelarEdicionUsuario();
     cargarListaUsuarios();
 }
