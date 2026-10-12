@@ -48,11 +48,18 @@
                 </div>
             </div>
 
-            <!-- Botones Superiores -->
+            <!-- Navegación Desktop (Pestañas) & Botones de Acción -->
             <div class="flex items-center gap-1.5 sm:gap-2">
-                <button type="button" onclick="nuevaOrden()" class="hidden md:flex bg-sky-600 hover:bg-sky-500 text-white text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition items-center gap-1">
-                    ➕ <span class="hidden sm:inline">Nueva Orden</span><span class="sm:hidden">Nueva</span>
-                </button>
+                <!-- Pestañas Desktop -->
+                <div class="hidden md:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 mr-2">
+                    <button type="button" id="tabNavNueva" onclick="cambiarSeccion('nueva')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition bg-sky-600 text-white shadow">
+                        ➕ <span>Nueva Orden</span>
+                    </button>
+                    <button type="button" id="tabNavBusqueda" onclick="cambiarSeccion('busqueda')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition">
+                        🔍 <span>Búsqueda de Órdenes</span>
+                    </button>
+                </div>
+
                 <button type="button" onclick="abrirModalStock()" class="bg-slate-700/90 hover:bg-slate-600 text-amber-400 border border-amber-500/30 text-[11px] sm:text-xs font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg shadow transition flex items-center gap-1">
                     🏷️ <span class="hidden sm:inline">Stock / Precios</span><span class="sm:hidden">Stock</span>
                 </button>
@@ -67,24 +74,24 @@
     </header>
 
     <!-- Mini Dashboard de Métricas Rápidas del Día -->
-    <section class="max-w-7xl mx-auto px-4 pt-4 pb-1 w-full">
-        <div class="grid grid-cols-3 gap-2 sm:gap-4 bg-slate-800/80 border border-slate-700/70 p-3 rounded-2xl shadow-lg">
+    <section class="max-w-7xl mx-auto px-4 pt-3 pb-1 w-full">
+        <div class="grid grid-cols-3 gap-2 sm:gap-4 bg-slate-800/80 border border-slate-700/70 p-2.5 sm:p-3 rounded-2xl shadow-lg">
             <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-                <div class="text-lg sm:text-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-1.5 sm:p-2 rounded-lg">💰</div>
+                <div class="text-base sm:text-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-1.5 sm:p-2 rounded-lg">💰</div>
                 <div>
                     <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Ventas de Hoy</div>
                     <div id="kpiVentasHoy" class="text-xs sm:text-lg font-black text-emerald-400">$0.00</div>
                 </div>
             </div>
-            <div class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-                <div class="text-lg sm:text-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 p-1.5 sm:p-2 rounded-lg">📋</div>
+            <div onclick="irABusquedaConFiltro('TODOS')" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900/90 hover:border-sky-500/40 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver todos los pedidos de hoy">
+                <div class="text-base sm:text-2xl bg-sky-500/10 group-hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 p-1.5 sm:p-2 rounded-lg transition">📋</div>
                 <div>
-                    <div class="text-[9px] sm:text-[11px] text-slate-400 font-bold uppercase tracking-wider">Pedidos Hoy</div>
+                    <div class="text-[9px] sm:text-[11px] text-slate-400 group-hover:text-sky-300 font-bold uppercase tracking-wider transition">Pedidos Hoy</div>
                     <div id="kpiOrdenesHoy" class="text-xs sm:text-lg font-black text-sky-400">0</div>
                 </div>
             </div>
-            <div onclick="filtrarEnviosPendientes()" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900 hover:border-amber-500/50 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver lista de envíos pendientes">
-                <div class="text-lg sm:text-2xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 p-1.5 sm:p-2 rounded-lg transition">🛵</div>
+            <div onclick="irABusquedaConFiltro('ENVIOS_PENDIENTES')" class="flex items-center gap-2 sm:gap-3 bg-slate-900/70 hover:bg-slate-900 hover:border-amber-500/50 cursor-pointer transition p-2 sm:p-2.5 rounded-xl border border-slate-700/50 group" title="Ver lista de envíos pendientes">
+                <div class="text-base sm:text-2xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 p-1.5 sm:p-2 rounded-lg transition">🛵</div>
                 <div>
                     <div class="text-[9px] sm:text-[11px] text-slate-400 group-hover:text-amber-300 font-bold uppercase tracking-wider transition">Envíos Pendientes</div>
                     <div id="kpiEnviosPendientes" class="text-xs sm:text-lg font-black text-amber-400">0</div>
@@ -94,19 +101,24 @@
     </section>
 
     <!-- Contenido Principal -->
-    <main class="max-w-7xl mx-auto px-4 py-4 w-full flex-grow">
-        <div class="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-6">
+    <main class="max-w-7xl mx-auto px-4 py-3 sm:py-4 w-full flex-grow mb-16 md:mb-4">
 
-            <!-- Columna Izquierda: Formulario (8 Cols) -->
-            <div class="lg:col-span-8 bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5">
+        <!-- ======================================================== -->
+        <!-- SECCIÓN 1: PANTALLA PRINCIPAL / FORMULARIO NUEVA ORDEN   -->
+        <!-- ======================================================== -->
+        <section id="seccionNuevaOrden" class="space-y-4">
+            <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5 max-w-4xl mx-auto">
                 
-                <!-- Buscador de Orden -->
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
-                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Gestión de Orden</span>
+                    <div>
+                        <span id="labelFormularioTitulo" class="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            📝 Alta de Nueva Orden
+                        </span>
+                        <p class="text-[10px] sm:text-xs text-slate-400 mt-0.5">Completá los datos del cliente, productos y modo de entrega</p>
+                    </div>
                     <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <input type="text" id="buscarOrdenInput" placeholder="#PAN-1001" class="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 w-full sm:w-48 focus:outline-none focus:border-slate-400">
-                        <button type="button" id="buscarBtn" onclick="buscarOrden()" class="bg-sky-600 hover:bg-sky-500 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition shadow">
-                            Buscar
+                        <button type="button" onclick="cambiarSeccion('busqueda')" class="text-xs text-sky-400 hover:text-sky-300 font-semibold underline flex items-center gap-1">
+                            🔍 Ir a Búsqueda de Órdenes
                         </button>
                     </div>
                 </div>
@@ -254,7 +266,7 @@
                             <button type="button" onclick="imprimirEtiqueta()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-2.5 px-4 rounded-lg text-xs transition flex items-center justify-center gap-1.5 w-full sm:w-auto">
                                 🖨️ <span>Etiqueta</span>
                             </button>
-                            <button type="button" onclick="limpiarFormulario()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 font-semibold py-2.5 px-4 rounded-lg text-xs transition w-full sm:w-auto">
+                            <button type="button" onclick="nuevaOrden()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 font-semibold py-2.5 px-4 rounded-lg text-xs transition w-full sm:w-auto">
                                 Limpiar
                             </button>
                             <button type="submit" id="submitBtn" class="flex-1 sm:flex-none bg-sky-600 hover:bg-sky-500 font-bold py-2.5 px-6 rounded-lg text-white shadow-lg transition text-center text-xs">
@@ -264,71 +276,124 @@
                     </div>
                 </form>
             </div>
+        </section>
 
-            <!-- Columna de Últimas Órdenes con Acciones Rápidas (Colapsable en Móvil) -->
-            <div class="lg:col-span-4 space-y-3">
-                <!-- Botón Nueva Orden en Móvil (Ocupa todo el ancho) -->
-                <button type="button" onclick="nuevaOrden()" class="lg:hidden w-full bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg border border-sky-400/30 flex items-center justify-center gap-2 text-xs transition active:scale-[0.98]">
-                    ➕ Nueva Orden
-                </button>
+        <!-- ======================================================== -->
+        <!-- SECCIÓN 2: BÚSQUEDA Y GESTIÓN AVANZADA DE ÓRDENES         -->
+        <!-- ======================================================== -->
+        <section id="seccionBusquedaOrdenes" class="hidden space-y-4">
+            <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-5">
+                
+                <!-- Encabezado de la Sección de Búsqueda -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-700/70 pb-3">
+                    <div>
+                        <h2 class="text-base sm:text-lg font-black text-white tracking-wide flex items-center gap-2">
+                            🔍 <span>Búsqueda de Órdenes y Pedidos</span>
+                            <span id="contadorOrdenesBusqueda" class="text-xs bg-slate-900 text-sky-400 px-2.5 py-0.5 rounded-full border border-slate-700 font-bold">0</span>
+                        </h2>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Filtrá pedidos recientes por número, cliente, vendedor, fechas o estado de entrega</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="cambiarSeccion('nueva')" class="bg-sky-600 hover:bg-sky-500 text-white font-bold py-1.5 px-3 rounded-lg text-xs transition shadow flex items-center gap-1">
+                            ➕ Nueva Orden
+                        </button>
+                    </div>
+                </div>
 
-                <div class="bg-slate-800/60 border border-slate-700/60 p-4 rounded-2xl shadow-xl">
-                    <!-- Header con botón colapsable para móvil -->
-                    <div class="flex items-center justify-between gap-2 cursor-pointer lg:cursor-default select-none" onclick="toggleListaPedidosMovil()">
-                        <div class="flex items-center gap-2">
-                            <h2 id="panelUltimosTitle" class="text-xs font-bold tracking-wider text-sky-400 uppercase">Pedidos Recientes</h2>
-                            <span id="contadorOrdenes" class="text-[10px] bg-slate-900 px-2 py-0.5 rounded-full border border-slate-700 text-slate-400 font-semibold">0</span>
+                <!-- Panel de Filtros Multicriterio -->
+                <div class="bg-slate-900/80 p-3 sm:p-4 rounded-xl border border-slate-700/80 space-y-3">
+                    <!-- Fila 1: Buscador de texto general -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-3">
+                        <div class="sm:col-span-6 relative">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Buscar por N° Orden / Cliente / Teléfono</label>
+                            <input type="text" id="filtroBusquedaTexto" oninput="onFiltroBusquedaInput()" placeholder="Ej: #PAN-1005, Juan Perez, 341..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-500">
                         </div>
-                        <div class="flex items-center gap-2">
-                            <!-- Indicador desplegable sólo visible en móvil -->
-                            <span id="iconoDesplegableMovil" class="lg:hidden text-xs text-sky-300 font-bold bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1 shadow-sm">
-                                📋 Ver Pedidos ▼
-                            </span>
-                            
-                            <!-- Filtros en Desktop -->
-                            <div class="hidden lg:flex items-center gap-1" onclick="event.stopPropagation()">
-                                <select id="filtroEstadoLista" onchange="cargarUltimasOrdenes()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
-                                    <option value="TODOS">📋 Todos</option>
-                                    <option value="ENVIOS_PENDIENTES">🛵 Envíos Pendientes</option>
-                                    <option value="Iniciado">🟡 Iniciado</option>
-                                    <option value="Abonado">🔵 Abonado</option>
-                                    <option value="Preparado">🟣 Preparado</option>
-                                    <option value="Finalizado">🟢 Finalizado</option>
-                                    <option value="Cancelado">🔴 Cancelado</option>
-                                </select>
-                                <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white p-1" title="Actualizar">🔄</button>
-                            </div>
+                        <div class="sm:col-span-3">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Estado</label>
+                            <select id="filtroBusquedaEstado" onchange="ejecutarBusquedaAvanzada()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white font-semibold focus:outline-none">
+                                <option value="TODOS">📋 Todos los estados</option>
+                                <option value="ENVIOS_PENDIENTES">🛵 Envíos Pendientes</option>
+                                <option value="Iniciado">🟡 Iniciado</option>
+                                <option value="Abonado">🔵 Abonado</option>
+                                <option value="Preparado">🟣 Preparado</option>
+                                <option value="Finalizado">🟢 Finalizado</option>
+                                <option value="Cancelado">🔴 Cancelado</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-3">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Vendedor</label>
+                            <input type="text" id="filtroBusquedaVendedor" oninput="onFiltroBusquedaInput()" placeholder="Ej: npanadisi..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-500">
                         </div>
                     </div>
 
-                    <!-- Contenedor Desplegable (Oculto en móvil por defecto, visible en Desktop) -->
-                    <div id="contenedorListaPedidosMovil" class="hidden lg:block mt-3 space-y-3 pt-3 border-t border-slate-700/60">
-                        <!-- Filtros en Móvil -->
-                        <div class="flex lg:hidden items-center justify-between gap-2 pb-1 bg-slate-900/40 p-2 rounded-xl border border-slate-700/40">
-                            <span class="text-[11px] text-slate-400 font-semibold">Estado:</span>
-                            <div class="flex items-center gap-1">
-                                <select id="filtroEstadoListaMovil" onchange="sincronizarFiltroMovil(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-300 focus:outline-none">
-                                    <option value="TODOS">📋 Todos</option>
-                                    <option value="ENVIOS_PENDIENTES">🛵 Envíos Pendientes</option>
-                                    <option value="Iniciado">🟡 Iniciado</option>
-                                    <option value="Abonado">🔵 Abonado</option>
-                                    <option value="Preparado">🟣 Preparado</option>
-                                    <option value="Finalizado">🟢 Finalizado</option>
-                                    <option value="Cancelado">🔴 Cancelado</option>
-                                </select>
-                                <button onclick="cargarUltimasOrdenes()" class="text-[10px] text-slate-400 hover:text-white p-1" title="Actualizar">🔄</button>
-                            </div>
+                    <!-- Fila 2: Rango de Fechas y Modo de Entrega -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-1 border-t border-slate-800">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha Desde</label>
+                            <input type="date" id="filtroBusquedaDesde" onchange="ejecutarBusquedaAvanzada()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
                         </div>
-
-                        <div id="listaUltimasOrdenes" class="space-y-2 max-h-[620px] overflow-y-auto pr-1">
-                            <p class="text-xs text-slate-500 italic">Cargando...</p>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha Hasta</label>
+                            <input type="date" id="filtroBusquedaHasta" onchange="ejecutarBusquedaAvanzada()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Modo Entrega</label>
+                            <select id="filtroBusquedaModo" onchange="ejecutarBusquedaAvanzada()" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
+                                <option value="TODOS">Todos</option>
+                                <option value="Retiro">🛍️ Retiro en Local</option>
+                                <option value="Envio">🛵 Envío a Domicilio</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end gap-1.5">
+                            <button type="button" onclick="limpiarFiltrosBusqueda()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-3 rounded-lg text-xs transition border border-slate-700">
+                                ↺ Limpiar
+                            </button>
+                            <button type="button" onclick="ejecutarBusquedaAvanzada()" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition shadow">
+                                🔍 Buscar
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
 
-        </div>
+                <!-- Lista de Resultados de Órdenes (Grid responsive: 1 col móvil, 2 cols tablet/PC) -->
+                <div>
+                    <div id="listaBusquedaOrdenes" class="grid grid-cols-1 md:grid-cols-2 gap-3 min-h-[200px]">
+                        <p class="text-xs text-slate-400 italic p-4 text-center md:col-span-2">Cargando pedidos recientes...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
+
+    <!-- ======================================================== -->
+    <!-- BARRA INFERIOR MÓVIL (BOTTOM NAVIGATION BAR)              -->
+    <!-- ======================================================== -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1 shadow-2xl flex justify-around items-center">
+        <!-- Botón Nueva Orden -->
+        <button type="button" id="bottomNavNueva" onclick="cambiarSeccion('nueva')" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-sky-400">
+            <span class="text-lg">➕</span>
+            <span class="text-[10px] font-bold mt-0.5">Nueva Orden</span>
+        </button>
+
+        <!-- Botón Búsqueda de Órdenes -->
+        <button type="button" id="bottomNavBusqueda" onclick="cambiarSeccion('busqueda')" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200">
+            <span class="text-lg">🔍</span>
+            <span class="text-[10px] font-bold mt-0.5">Buscar</span>
+        </button>
+
+        <!-- Botón Stock / Precios -->
+        <button type="button" onclick="abrirModalStock()" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-amber-400">
+            <span class="text-lg">🏷️</span>
+            <span class="text-[10px] font-bold mt-0.5">Stock</span>
+        </button>
+
+        <!-- Botón Informes (Solo si tiene permiso) -->
+        <button type="button" id="bottomNavInformes" onclick="abrirModalExportar()" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-emerald-400">
+            <span class="text-lg">📊</span>
+            <span class="text-[10px] font-bold mt-0.5">Informes</span>
+        </button>
+    </nav>
 
     <!-- Modal Informes y Presentaciones Ejecutivas -->
     <div id="modalExportar" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">

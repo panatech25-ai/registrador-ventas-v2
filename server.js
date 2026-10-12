@@ -427,6 +427,63 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
     res.json(procesarOrdenParaRespuesta(orden));
 });
 
+// API Búsqueda Avanzada de Órdenes (Filtros múltiples: texto, estado, vendedor, fecha, modo)
+app.get('/api/ordenes/avanzada', async (req, res) => {
+    const { marca, q, estado, vendedor, fechaDesde, fechaHasta, modo_entrega, limite } = req.query;
+    const marcaTarget = (marca || 'panatech').toLowerCase();
+    const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
+    const limitNum = parseInt(limite) || 50;
+
+    try {
+        let query = supabase
+            .from('ordenes')
+            .select(`*, orden_detalles(*, productos(*))`)
+            .ilike('numero_orden', `${prefijo}%`);
+
+        if (q && q.trim()) {
+            const termino = q.trim();
+            // Buscar por número de orden, cliente o teléfono
+            query = query.or(`numero_orden.ilike.%${termino}%,cliente_nombre.ilike.%${termino}%,cliente_telefono.ilike.%${termino}%`);
+        }
+
+        if (estado && estado !== 'TODOS') {
+            if (estado === 'ENVIOS_PENDIENTES') {
+                query = query
+                    .eq('modo_entrega', 'Envio')
+                    .neq('estado', 'Finalizado')
+                    .neq('estado', 'Cancelado');
+            } else {
+                query = query.eq('estado', estado);
+            }
+        }
+
+        if (vendedor && vendedor.trim()) {
+            query = query.ilike('vendedor', `%${vendedor.trim()}%`);
+        }
+
+        if (modo_entrega && modo_entrega !== 'TODOS') {
+            query = query.eq('modo_entrega', modo_entrega);
+        }
+
+        if (fechaDesde) {
+            query = query.gte('fecha', fechaDesde);
+        }
+
+        if (fechaHasta) {
+            query = query.lte('fecha', fechaHasta);
+        }
+
+        const { data, error } = await query
+            .order('id', { ascending: false })
+            .limit(limitNum);
+
+        if (error) throw error;
+        res.json((data || []).map(procesarOrdenParaRespuesta));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // API Actualización Rápida de Estado (Iniciado -> Abonado -> Preparado -> Finalizado -> Cancelado)
 app.patch('/api/ordenes/:id/estado', async (req, res) => {
     const { id } = req.params;

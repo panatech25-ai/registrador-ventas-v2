@@ -100,11 +100,22 @@ function configurarMarcaUI() {
     // Panatech -> Solo npanadisi
     // Incanto  -> Solo bprimo
     const btnInformes = document.getElementById('btnMenuInformes');
+    const bottomNavInformes = document.getElementById('bottomNavInformes');
+    const tienePermiso = usuarioTienePermisoInformes();
+
     if (btnInformes) {
-        if (usuarioTienePermisoInformes()) {
+        if (tienePermiso) {
             btnInformes.classList.remove('hidden');
         } else {
             btnInformes.classList.add('hidden');
+        }
+    }
+
+    if (bottomNavInformes) {
+        if (tienePermiso) {
+            bottomNavInformes.classList.remove('hidden');
+        } else {
+            bottomNavInformes.classList.add('hidden');
         }
     }
 }
@@ -579,96 +590,212 @@ function filtrarEnviosPendientes() {
     cargarUltimasOrdenes();
 }
 
-async function cargarUltimasOrdenes() {
-    const list = document.getElementById('listaUltimasOrdenes');
-    const filtroSelectDesk = document.getElementById('filtroEstadoLista');
-    const filtroSelectMovil = document.getElementById('filtroEstadoListaMovil');
-    const contador = document.getElementById('contadorOrdenes');
-    
-    let estadoFiltro = 'TODOS';
-    if (filtroSelectDesk) {
-        estadoFiltro = filtroSelectDesk.value;
-        if (filtroSelectMovil && filtroSelectMovil.value !== estadoFiltro) {
-            filtroSelectMovil.value = estadoFiltro;
+// ==========================================
+// NAVEGACIÓN ENTRE PANTALLAS (Desktop & Móvil)
+// ==========================================
+let SECCION_ACTUAL = 'nueva';
+
+function cambiarSeccion(seccion) {
+    SECCION_ACTUAL = seccion;
+    const secNueva = document.getElementById('seccionNuevaOrden');
+    const secBusqueda = document.getElementById('seccionBusquedaOrdenes');
+
+    const tabNueva = document.getElementById('tabNavNueva');
+    const tabBusqueda = document.getElementById('tabNavBusqueda');
+
+    const bNavNueva = document.getElementById('bottomNavNueva');
+    const bNavBusqueda = document.getElementById('bottomNavBusqueda');
+
+    const esIncanto = MARCA_ACTUAL === 'incanto';
+    const bgActivo = esIncanto ? 'bg-rose-600' : 'bg-sky-600';
+    const textActivo = esIncanto ? 'text-rose-400' : 'text-sky-400';
+
+    if (seccion === 'nueva') {
+        if (secNueva) secNueva.classList.remove('hidden');
+        if (secBusqueda) secBusqueda.classList.add('hidden');
+
+        // Pestañas Desktop
+        if (tabNueva) {
+            tabNueva.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${bgActivo} text-white shadow`;
         }
-    } else if (filtroSelectMovil) {
-        estadoFiltro = filtroSelectMovil.value;
+        if (tabBusqueda) {
+            tabBusqueda.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition";
+        }
+
+        // Barra Móvil
+        if (bNavNueva) {
+            bNavNueva.className = `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo}`;
+        }
+        if (bNavBusqueda) {
+            bNavBusqueda.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (seccion === 'busqueda') {
+        if (secNueva) secNueva.classList.add('hidden');
+        if (secBusqueda) secBusqueda.classList.remove('hidden');
+
+        // Pestañas Desktop
+        if (tabNueva) {
+            tabNueva.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition";
+        }
+        if (tabBusqueda) {
+            tabBusqueda.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${bgActivo} text-white shadow`;
+        }
+
+        // Barra Móvil
+        if (bNavNueva) {
+            bNavNueva.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
+        }
+        if (bNavBusqueda) {
+            bNavBusqueda.className = `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo}`;
+        }
+
+        // Si la lista está vacía o es la primera vez que se entra, buscar órdenes
+        ejecutarBusquedaAvanzada();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+}
+
+function irABusquedaConFiltro(estado) {
+    cambiarSeccion('busqueda');
+    const selectEstado = document.getElementById('filtroBusquedaEstado');
+    if (selectEstado) {
+        selectEstado.value = estado;
+    }
+    ejecutarBusquedaAvanzada();
+}
+
+function renderizarTarjetaOrden(o) {
+    let colorBorder = 'border-amber-700/60 bg-amber-950/30';
+    let colorTexto = 'text-amber-400';
+    if (o.estado === 'Abonado') { colorBorder = 'border-blue-700/60 bg-blue-950/30'; colorTexto = 'text-blue-400'; }
+    if (o.estado === 'Preparado') { colorBorder = 'border-purple-700/60 bg-purple-950/30'; colorTexto = 'text-purple-400'; }
+    if (o.estado === 'Finalizado') { colorBorder = 'border-emerald-700/60 bg-emerald-950/30'; colorTexto = 'text-emerald-400'; }
+    if (o.estado === 'Cancelado') { colorBorder = 'border-rose-700/60 bg-rose-950/30'; colorTexto = 'text-rose-400'; }
+
+    const vendedorTxt = o.vendedor ? `• 👤 ${o.vendedor}` : '';
+    const telefonoTxt = o.cliente_telefono ? `• 📞 ${o.cliente_telefono}` : '';
+
+    return `
+        <div class="p-3 bg-slate-900/90 hover:bg-slate-900 rounded-xl border ${colorBorder} transition flex flex-col justify-between gap-2 text-xs group shadow-sm">
+            <div class="cursor-pointer" onclick="cargarOrdenEnFormulario('${o.numero_orden}')">
+                <div class="flex justify-between items-start gap-2">
+                    <div>
+                        <div class="font-black text-white flex items-center gap-1.5 flex-wrap">
+                            <span class="text-sm font-black tracking-wide">${o.numero_orden}</span>
+                            <span class="font-bold text-slate-200 text-xs truncate max-w-[170px]">${o.cliente_nombre || 'Cliente S/D'}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span>📅 ${formatearFechaVista(o.fecha)}</span>
+                            <span>${o.modo_entrega === 'Envio' ? '🛵 Envío' : '🛍️ Retiro'}</span>
+                            <span>${vendedorTxt}</span>
+                            <span>${telefonoTxt}</span>
+                        </div>
+                    </div>
+                    <div class="text-right whitespace-nowrap">
+                        <div class="font-extrabold text-emerald-400 text-sm sm:text-base">$${parseFloat(o.total || 0).toFixed(2)}</div>
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block">${o.metodo_pago || 'S/D'}</span>
+                    </div>
+                </div>
+
+                ${o.observaciones ? `
+                    <div class="text-[10px] text-slate-400 italic bg-slate-950/50 p-1.5 rounded mt-1.5 line-clamp-1 border border-slate-800">
+                        📝 ${o.observaciones}
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Fila de Acciones Rápidas: Selector de Estado e Impresión Directa -->
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-slate-400 font-semibold">Estado:</span>
+                    <select onchange="cambiarEstadoRapido(${o.id}, this.value)" class="bg-slate-800 border border-slate-700 text-[10px] font-bold ${colorTexto} rounded-md px-2 py-1 focus:outline-none">
+                        <option value="Iniciado" ${o.estado === 'Iniciado' ? 'selected' : ''}>🟡 Iniciado</option>
+                        <option value="Abonado" ${o.estado === 'Abonado' ? 'selected' : ''}>🔵 Abonado</option>
+                        <option value="Preparado" ${o.estado === 'Preparado' ? 'selected' : ''}>🟣 Preparado</option>
+                        <option value="Finalizado" ${o.estado === 'Finalizado' ? 'selected' : ''}>🟢 Finalizado</option>
+                        <option value="Cancelado" ${o.estado === 'Cancelado' ? 'selected' : ''}>🔴 Cancelado</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="imprimirEtiquetaDirecta(${JSON.stringify(o).replace(/"/g, '&quot;')})" title="Imprimir Etiqueta" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-1 rounded-md text-[11px] border border-slate-700 transition flex items-center gap-1">
+                        🖨️ <span class="hidden sm:inline">Ticket</span>
+                    </button>
+                    <button type="button" onclick="cargarOrdenEnFormulario('${o.numero_orden}')" title="Editar Pedido" class="bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 px-2.5 py-1 rounded-md text-[11px] font-bold border border-sky-500/40 transition flex items-center gap-1">
+                        ✏️ <span>Editar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Búsqueda Avanzada
+const onFiltroBusquedaInput = debounce(() => ejecutarBusquedaAvanzada(), 300);
+
+async function ejecutarBusquedaAvanzada() {
+    const list = document.getElementById('listaBusquedaOrdenes');
+    const contador = document.getElementById('contadorOrdenesBusqueda');
+    if (!list) return;
+
+    const q = (document.getElementById('filtroBusquedaTexto')?.value || '').trim();
+    const estado = document.getElementById('filtroBusquedaEstado')?.value || 'TODOS';
+    const vendedor = (document.getElementById('filtroBusquedaVendedor')?.value || '').trim();
+    const fechaDesde = document.getElementById('filtroBusquedaDesde')?.value || '';
+    const fechaHasta = document.getElementById('filtroBusquedaHasta')?.value || '';
+    const modo_entrega = document.getElementById('filtroBusquedaModo')?.value || 'TODOS';
+
+    const params = new URLSearchParams({
+        marca: MARCA_ACTUAL,
+        limite: 60
+    });
+    if (q) params.set('q', q);
+    if (estado !== 'TODOS') params.set('estado', estado);
+    if (vendedor) params.set('vendedor', vendedor);
+    if (fechaDesde) params.set('fechaDesde', fechaDesde);
+    if (fechaHasta) params.set('fechaHasta', fechaHasta);
+    if (modo_entrega !== 'TODOS') params.set('modo_entrega', modo_entrega);
 
     try {
-        const res = await fetch(`/api/ordenes/ultimas?marca=${MARCA_ACTUAL}&limite=30`);
+        const res = await fetch(`/api/ordenes/avanzada?${params.toString()}`);
         const ordenes = await res.json();
-        ultimasOrdenesMemoria = ordenes || [];
 
-        let ordenesFiltradas = ultimasOrdenesMemoria;
-        if (estadoFiltro === 'ENVIOS_PENDIENTES') {
-            ordenesFiltradas = ultimasOrdenesMemoria.filter(o => 
-                o.modo_entrega === 'Envio' && o.estado !== 'Finalizado' && o.estado !== 'Cancelado'
-            );
-        } else if (estadoFiltro !== 'TODOS') {
-            ordenesFiltradas = ultimasOrdenesMemoria.filter(o => o.estado === estadoFiltro);
-        }
+        if (contador) contador.textContent = (ordenes || []).length;
 
-        if (contador) contador.textContent = ordenesFiltradas.length;
-
-        if (ordenesFiltradas.length === 0) {
-            const labelVacio = estadoFiltro === 'ENVIOS_PENDIENTES' 
-                ? 'de envíos pendientes de entrega' 
-                : (estadoFiltro !== 'TODOS' ? `en estado '${estadoFiltro}'` : '');
-            list.innerHTML = `<p class="text-xs text-slate-500 italic p-3 text-center">Sin pedidos ${labelVacio}.</p>`;
+        if (!ordenes || ordenes.length === 0) {
+            list.innerHTML = `
+                <div class="p-8 text-center text-slate-400 italic md:col-span-2 bg-slate-900/40 rounded-xl border border-slate-800">
+                    <p class="text-sm">No se encontraron órdenes con los criterios especificados.</p>
+                    <button type="button" onclick="limpiarFiltrosBusqueda()" class="mt-2 text-xs text-sky-400 hover:underline font-bold">
+                        Limpiar todos los filtros
+                    </button>
+                </div>
+            `;
             return;
         }
 
-        list.innerHTML = ordenesFiltradas.map(o => {
-            let colorBorder = 'border-amber-700/60 bg-amber-950/30';
-            let colorTexto = 'text-amber-400';
-            if (o.estado === 'Abonado') { colorBorder = 'border-blue-700/60 bg-blue-950/30'; colorTexto = 'text-blue-400'; }
-            if (o.estado === 'Preparado') { colorBorder = 'border-purple-700/60 bg-purple-950/30'; colorTexto = 'text-purple-400'; }
-            if (o.estado === 'Finalizado') { colorBorder = 'border-emerald-700/60 bg-emerald-950/30'; colorTexto = 'text-emerald-400'; }
-            if (o.estado === 'Cancelado') { colorBorder = 'border-rose-700/60 bg-rose-950/30'; colorTexto = 'text-rose-400'; }
-
-            return `
-                <div class="p-3 bg-slate-900/90 hover:bg-slate-900 rounded-xl border ${colorBorder} transition flex flex-col gap-2 text-xs group shadow-sm">
-                    <div class="flex justify-between items-start cursor-pointer" onclick="cargarOrdenEnFormulario('${o.numero_orden}')">
-                        <div>
-                            <div class="font-black text-white flex items-center gap-1.5">
-                                <span>${o.numero_orden}</span>
-                                <span class="font-normal text-slate-400 text-[11px] truncate max-w-[130px]">- ${o.cliente_nombre || 'S/D'}</span>
-                            </div>
-                            <div class="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
-                                <span>📅 ${formatearFechaVista(o.fecha)}</span>
-                                <span>${o.modo_entrega === 'Envio' ? '🛵 Envío' : '🛍️ Retiro'}</span>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="font-extrabold text-emerald-400 text-sm">$${parseFloat(o.total).toFixed(2)}</div>
-                        </div>
-                    </div>
-
-                    <!-- Fila de Acciones Rápidas: Selector de Estado e Impresión Directa -->
-                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800">
-                        <select onchange="cambiarEstadoRapido(${o.id}, this.value)" class="bg-slate-800 border border-slate-700 text-[10px] font-bold ${colorTexto} rounded-md px-2 py-1 focus:outline-none">
-                            <option value="Iniciado" ${o.estado === 'Iniciado' ? 'selected' : ''}>🟡 Iniciado</option>
-                            <option value="Abonado" ${o.estado === 'Abonado' ? 'selected' : ''}>🔵 Abonado</option>
-                            <option value="Preparado" ${o.estado === 'Preparado' ? 'selected' : ''}>🟣 Preparado</option>
-                            <option value="Finalizado" ${o.estado === 'Finalizado' ? 'selected' : ''}>🟢 Finalizado</option>
-                            <option value="Cancelado" ${o.estado === 'Cancelado' ? 'selected' : ''}>🔴 Cancelado</option>
-                        </select>
-
-                        <div class="flex items-center gap-1">
-                            <button type="button" onclick="imprimirEtiquetaDirecta(${JSON.stringify(o).replace(/"/g, '&quot;')})" title="Imprimir Etiqueta" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-1 rounded-md text-[11px] border border-slate-700 transition">
-                                🖨️
-                            </button>
-                            <button type="button" onclick="cargarOrdenEnFormulario('${o.numero_orden}')" title="Editar Pedido" class="bg-slate-800 hover:bg-slate-700 text-sky-400 p-1 rounded-md text-[11px] border border-slate-700 transition">
-                                ✏️
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        list.innerHTML = ordenes.map(renderizarTarjetaOrden).join('');
     } catch (err) {
-        list.innerHTML = '<p class="text-xs text-rose-400 p-2">Error al cargar listado de pedidos.</p>';
+        list.innerHTML = '<p class="text-xs text-rose-400 p-4 md:col-span-2 text-center">Error al buscar órdenes.</p>';
+    }
+}
+
+function limpiarFiltrosBusqueda() {
+    if (document.getElementById('filtroBusquedaTexto')) document.getElementById('filtroBusquedaTexto').value = '';
+    if (document.getElementById('filtroBusquedaEstado')) document.getElementById('filtroBusquedaEstado').value = 'TODOS';
+    if (document.getElementById('filtroBusquedaVendedor')) document.getElementById('filtroBusquedaVendedor').value = '';
+    if (document.getElementById('filtroBusquedaDesde')) document.getElementById('filtroBusquedaDesde').value = '';
+    if (document.getElementById('filtroBusquedaHasta')) document.getElementById('filtroBusquedaHasta').value = '';
+    if (document.getElementById('filtroBusquedaModo')) document.getElementById('filtroBusquedaModo').value = 'TODOS';
+    ejecutarBusquedaAvanzada();
+}
+
+async function cargarUltimasOrdenes() {
+    // Si la sección de búsqueda está visible, refrescar la búsqueda avanzada
+    if (SECCION_ACTUAL === 'busqueda') {
+        ejecutarBusquedaAvanzada();
     }
 }
 
@@ -682,7 +809,7 @@ async function cambiarEstadoRapido(ordenId, nuevoEstado) {
         const data = await res.json();
         if (data.success) {
             showToast(`Estado actualizado a: ${nuevoEstado}`, 'success');
-            cargarUltimasOrdenes();
+            ejecutarBusquedaAvanzada();
             cargarMetricasHoy();
         } else {
             showToast('Error al actualizar estado: ' + (data.error || ''), 'error');
@@ -694,34 +821,87 @@ async function cambiarEstadoRapido(ordenId, nuevoEstado) {
 
 function nuevaOrden() {
     limpiarFormulario();
-    const buscarInput = document.getElementById('buscarOrdenInput');
-    if (buscarInput) buscarInput.value = '';
-    
-    // Scroll hacia el formulario
-    const formElement = document.getElementById('ordenForm');
-    if (formElement) {
-        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    cambiarSeccion('nueva');
     showToast('Nuevo pedido listo para registrar.', 'info');
 }
 
 function cargarOrdenEnFormulario(num) {
-    document.getElementById('buscarOrdenInput').value = num;
-    buscarOrden();
+    cambiarSeccion('nueva');
+    const input = document.getElementById('buscarOrdenInput');
+    if (input) input.value = num;
+    buscarOrdenDirecto(num);
+}
 
-    // En versión celular (menor a 1024px), ocultar la lista de pedidos recientes
-    if (window.innerWidth < 1024) {
-        const container = document.getElementById('contenedorListaPedidosMovil');
-        const icono = document.getElementById('iconoDesplegableMovil');
-        if (container && !container.classList.contains('hidden')) {
-            container.classList.add('hidden');
-            if (icono) icono.innerHTML = '📋 Ver Pedidos ▼';
+async function buscarOrdenDirecto(num) {
+    if (!num) return;
+    try {
+        const res = await fetch(`/api/ordenes/buscar/${encodeURIComponent(num)}?marca=${MARCA_ACTUAL}`);
+        const data = await res.json();
+
+        if (res.status === 403) {
+            showToast(data.error, 'error');
+            return;
         }
-        // Scroll suave al formulario para ver el pedido cargado
-        const formContainer = document.getElementById('ordenForm');
-        if (formContainer) {
-            formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        if (!res.ok || !data) {
+            showToast('Orden no encontrada.', 'warning');
+            return;
         }
+
+        document.getElementById('ordenId').value = data.id;
+        
+        if (data.fecha) {
+            const fechaLimpia = data.fecha.split('T')[0];
+            document.getElementById('fecha').value = fechaLimpia;
+        }
+
+        document.getElementById('vendedor').value = data.vendedor || USUARIO_ACTUAL;
+        document.getElementById('cliente_nombre').value = data.cliente_nombre || '';
+        document.getElementById('cliente_telefono').value = data.cliente_telefono || '';
+        document.getElementById('observaciones').value = data.observaciones || '';
+        document.getElementById('modo_entrega').value = data.modo_entrega || 'Retiro';
+        document.getElementById('cadete').value = data.cadete || '';
+        document.getElementById('direccion_envio').value = data.direccion_envio || '';
+        document.getElementById('costo_envio').value = data.costo_envio || 0;
+        document.getElementById('horario_envio').value = data.horario_envio || '';
+        
+        const est = data.estado || 'Iniciado';
+        document.getElementById('estado_pedido').value = est;
+        actualizarColorEstado(est);
+
+        document.getElementById('metodo_pago').value = data.metodo_pago || 'Sin especificar';
+
+        const submitBtn = document.getElementById('submitBtn');
+        if (submitBtn) {
+            submitBtn.textContent = 'Actualizar Orden';
+        }
+
+        const labelTitulo = document.getElementById('labelFormularioTitulo');
+        if (labelTitulo) {
+            labelTitulo.innerHTML = `✏️ Editando Pedido <span class="text-amber-400">${data.numero_orden}</span>`;
+        }
+
+        toggleEnvioFields();
+
+        // Restaurar estado de pago de envío
+        const chkProd = document.getElementById('chk_prod_abonado');
+        const chkTotal = document.getElementById('chk_abonado_total');
+        if (chkProd) chkProd.checked = (data.pago_envio === 'PRODUCTO_ABONADO');
+        if (chkTotal) chkTotal.checked = (data.pago_envio === 'ABONADO_TOTAL');
+
+        carrito = (data.orden_detalles || []).map(d => ({
+            id: d.producto_id,
+            nombre: (d.productos && d.productos.nombre) ? d.productos.nombre : 'Producto',
+            variante: d.productos ? d.productos.variante : '',
+            precio: parseFloat(d.precio_unitario),
+            cantidad: d.cantidad
+        }));
+
+        renderCarrito();
+        showToast(`Orden ${data.numero_orden} cargada en formulario.`, 'info');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+        showToast('Error al cargar la orden.', 'error');
     }
 }
 
@@ -735,6 +915,11 @@ function limpiarFormulario() {
     actualizarColorEstado('Iniciado');
     document.getElementById('metodo_pago').value = 'Sin especificar';
     
+    const labelTitulo = document.getElementById('labelFormularioTitulo');
+    if (labelTitulo) {
+        labelTitulo.innerHTML = `📝 Alta de Nueva Orden`;
+    }
+
     const chkP = document.getElementById('chk_prod_abonado');
     const chkT = document.getElementById('chk_abonado_total');
     if (chkP) chkP.checked = false;
