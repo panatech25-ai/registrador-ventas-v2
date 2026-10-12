@@ -1023,17 +1023,99 @@ app.get('/api/mayorista/metricas', async (req, res) => {
     }
 });
 
-// Listar productos / catálogo propio de Incanto Mayorista
+// Listar productos de Stock Mayorista enriquecidos con fotos de Incanto
 app.get('/api/mayorista/productos', async (req, res) => {
     try {
-        const { data, error } = await supabase
-            .from('productos')
-            .select('*')
-            .eq('marca', 'incanto_mayorista')
-            .order('nombre', { ascending: true });
+        const [{ data, error }, metadataIncanto, prodsIncanto] = await Promise.all([
+            supabase
+                .from('productos')
+                .select('*')
+                .eq('marca', 'incanto_mayorista')
+                .order('nombre', { ascending: true }),
+            obtenerMetadataMarca(supabase, 'incanto'),
+            fetchAllDbProductsByBrand(supabase, 'incanto')
+        ]);
 
         if (error) throw error;
-        res.json(data || []);
+
+        // Mapa de nombre normalizado -> imagen_url de Incanto para enriquecer visualmente el stock mayorista
+        const imgPorNombre = new Map();
+        for (const pi of (prodsIncanto || [])) {
+            const meta = metadataIncanto[pi.id];
+            if (meta && meta.imagen_url && meta.imagen_url !== '/img/no-image.svg') {
+                imgPorNombre.set((pi.nombre || '').toLowerCase().trim(), meta.imagen_url);
+            }
+        }
+
+        const enriquecidos = (data || []).map(p => ({
+            ...p,
+            imagen_url: imgPorNombre.get((p.nombre || '').toLowerCase().trim()) || '/img/no-image.svg'
+        }));
+
+        res.json(enriquecidos);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Catálogo base de productos de Incanto para sugerir al cargar Compras Mayoristas
+app.get('/api/mayorista/catalogo-origen', async (req, res) => {
+    try {
+        const [prodsIncanto, prodsMayorista, metadataIncanto] = await Promise.all([
+            fetchAllDbProductsByBrand(supabase, 'incanto'),
+            supabase.from('productos').select('*').eq('marca', 'incanto_mayorista'),
+            obtenerMetadataMarca(supabase, 'incanto')
+        ]);
+
+        const stockMayPorNombre = new Map();
+        for (const pm of (prodsMayorista.data || [])) {
+            stockMayPorNombre.set((pm.nombre || '').toLowerCase().trim(), pm);
+        }
+
+        const mapUnicos = new Map();
+        for (const p of (prodsIncanto || [])) {
+            const norm = (p.nombre || '').toLowerCase().trim();
+            if (!norm) continue;
+            const meta = metadataIncanto[p.id] || null;
+            const pmExist = stockMayPorNombre.get(norm);
+            const item = {
+                incanto_id: p.id,
+                mayorista_id: pmExist ? pmExist.id : null,
+                nombre: p.nombre,
+                codigo_sku: p.codigo_sku,
+                variante: p.variante || 'Mayorista',
+                precio_referencia: pmExist && pmExist.precio > 0 ? pmExist.precio : (p.precio || 0),
+                stock_mayorista: pmExist ? (parseInt(pmExist.stock) || 0) : 0,
+                imagen_url: meta && meta.imagen_url ? meta.imagen_url : '/img/no-image.svg'
+            };
+
+            if (!mapUnicos.has(norm) || (item.imagen_url !== '/img/no-image.svg' && mapUnicos.get(norm).imagen_url === '/img/no-image.svg')) {
+                mapUnicos.set(norm, item);
+            }
+        }
+
+        // También incluir cualquier producto que esté en incanto_mayorista pero no en incanto
+        for (const pm of (prodsMayorista.data || [])) {
+            const norm = (pm.nombre || '').toLowerCase().trim();
+            if (norm && !mapUnicos.has(norm)) {
+                mapUnicos.set(norm, {
+                    incanto_id: null,
+                    mayorista_id: pm.id,
+                    nombre: pm.nombre,
+                    codigo_sku: pm.codigo_sku,
+                    variante: pm.variante || 'Mayorista',
+                    precio_referencia: pm.precio || 0,
+                    stock_mayorista: parseInt(pm.stock) || 0,
+                    imagen_url: '/img/no-image.svg'
+                });
+            }
+        }
+
+        const resultado = Array.from(mapUnicos.values()).sort((a, b) =>
+            a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+        );
+
+        res.json(resultado);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1048,11 +1130,10 @@ app.post('/api/mayorista/productos', async (req, res) => {
 
     try {
         if (id) {
-            // Actualizar
             const { data, error } = await supabase
                 .from('productos')
                 .update({
-                    nombre,
+                    nombre: nombre.trim(),
                     variante: variante || 'Mayorista',
                     precio: parseFloat(precio) || 0,
                     stock: parseInt(stock) || 0
@@ -1065,13 +1146,12 @@ app.post('/api/mayorista/productos', async (req, res) => {
             if (error) throw error;
             return res.json({ success: true, producto: data });
         } else {
-            // Crear
             const codigo_sku = `MAY-${Date.now().toString().slice(-6)}`;
             const { data, error } = await supabase
                 .from('productos')
                 .insert([{
                     codigo_sku,
-                    nombre,
+                    nombre: nombre.trim(),
                     variante: variante || 'Mayorista',
                     precio: parseFloat(precio) || 0,
                     stock: parseInt(stock) || 0,
@@ -1088,10 +1168,222 @@ app.post('/api/mayorista/productos', async (req, res) => {
     }
 });
 
+// Eliminar un producto directamente del Stock Mayorista
+app.delete('/api/mayorista/productos/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const { error } = await supabase
+            .from('productos')
+            .delete()
+            .eq('id', id)
+            .eq('marca', 'incanto_mayorista');
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Helper para parsear una orden mayorista (soporta formato de 1 ítem o multi-ítems)
+function parsearOrdenMayorista(t) {
+    let detalleJson = null;
+    try {
+        detalleJson = t.observaciones ? JSON.parse(t.observaciones) : null;
+    } catch (e) {
+        detalleJson = { texto: t.observaciones };
+    }
+
+    const esVenta = (t.numero_orden || '').includes('VTA');
+    let items = [];
+
+    if (detalleJson && Array.isArray(detalleJson.items) && detalleJson.items.length > 0) {
+        items = detalleJson.items.map(it => {
+            const cant = parseInt(it.cantidad) || 1;
+            const unit = parseFloat(it.precio_unitario) || 0;
+            const sub = parseFloat(it.subtotal) || (cant * unit);
+            return {
+                producto_id: it.producto_id || null,
+                producto_nombre: it.producto_nombre || 'Producto',
+                cantidad: cant,
+                precio_unitario: unit,
+                subtotal: sub
+            };
+        });
+    } else if (detalleJson && detalleJson.producto_nombre) {
+        const cant = parseInt(detalleJson.cantidad) || 1;
+        const unit = parseFloat(detalleJson.precio_unitario) || ((parseFloat(t.total) || 0) / cant);
+        items = [{
+            producto_id: detalleJson.producto_id || null,
+            producto_nombre: detalleJson.producto_nombre,
+            cantidad: cant,
+            precio_unitario: unit,
+            subtotal: parseFloat(t.total) || (cant * unit)
+        }];
+    }
+
+    const cantidadTotal = items.reduce((acc, it) => acc + (parseInt(it.cantidad) || 0), 0) || 1;
+    const resumenProductos = items.length > 0
+        ? items.map(it => `${it.producto_nombre} (x${it.cantidad})`).join(', ')
+        : 'Producto';
+
+    return {
+        id: t.id,
+        numero: t.numero_orden,
+        tipo: esVenta ? 'venta' : 'compra',
+        fecha: t.fecha,
+        persona: t.cliente_nombre,
+        items,
+        producto: items.length === 1 ? items[0].producto_nombre : resumenProductos,
+        cantidad: cantidadTotal,
+        precio_unitario: items.length === 1 ? items[0].precio_unitario : ((parseFloat(t.total) || 0) / cantidadTotal),
+        total: parseFloat(t.total) || 0,
+        estado: t.estado,
+        vendedor: t.vendedor
+    };
+}
+
+// Helper para buscar o crear producto en Stock Mayorista (`incanto_mayorista`)
+async function obtenerOCrearProductoMayorista({ producto_id, producto_nombre, precio_unitario }) {
+    let prodTarget = null;
+    const nombreLimpio = (producto_nombre || '').trim();
+
+    if (producto_id) {
+        const { data: p } = await supabase
+            .from('productos')
+            .select('*')
+            .eq('id', producto_id)
+            .eq('marca', 'incanto_mayorista')
+            .maybeSingle();
+        prodTarget = p;
+    }
+
+    if (!prodTarget && nombreLimpio) {
+        const { data: pExist } = await supabase
+            .from('productos')
+            .select('*')
+            .eq('marca', 'incanto_mayorista')
+            .ilike('nombre', nombreLimpio)
+            .maybeSingle();
+        if (pExist) prodTarget = pExist;
+    }
+
+    if (!prodTarget) {
+        const codigo_sku = `MAY-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 90 + 10)}`;
+        const { data: pNew, error: pErr } = await supabase
+            .from('productos')
+            .insert([{
+                codigo_sku,
+                nombre: nombreLimpio || 'Producto Mayorista',
+                variante: 'Mayorista',
+                precio: parseFloat(precio_unitario) || 0,
+                stock: 0,
+                marca: 'incanto_mayorista'
+            }])
+            .select()
+            .single();
+        if (pErr) throw pErr;
+        prodTarget = pNew;
+    }
+
+    return prodTarget;
+}
+
+// Helper para revertir el impacto de stock de una transacción mayorista previa (antes de editar o eliminar)
+async function revertirStockTransaccionMayorista(transaccionParseada) {
+    const esVenta = transaccionParseada.tipo === 'venta';
+    for (const item of (transaccionParseada.items || [])) {
+        const cant = parseInt(item.cantidad) || 0;
+        if (cant <= 0) continue;
+
+        let prod = null;
+        if (item.producto_id) {
+            const { data } = await supabase
+                .from('productos')
+                .select('*')
+                .eq('id', item.producto_id)
+                .eq('marca', 'incanto_mayorista')
+                .maybeSingle();
+            prod = data;
+        }
+        if (!prod && item.producto_nombre) {
+            const { data } = await supabase
+                .from('productos')
+                .select('*')
+                .eq('marca', 'incanto_mayorista')
+                .ilike('nombre', item.producto_nombre.trim())
+                .maybeSingle();
+            prod = data;
+        }
+
+        if (prod) {
+            // Si era una venta, al revertirla devolvemos (sumamos) el stock.
+            // Si era una compra, al revertirla restamos el stock que había sumado.
+            const stockActual = parseInt(prod.stock) || 0;
+            const nuevoStock = esVenta
+                ? (stockActual + cant)
+                : Math.max(0, stockActual - cant);
+
+            await supabase
+                .from('productos')
+                .update({ stock: nuevoStock })
+                .eq('id', prod.id);
+        }
+    }
+}
+
+// Helper para aplicar el impacto de stock de una lista de ítems (en creación o edición)
+async function aplicarStockItemsMayorista(tipo, rawItems) {
+    const esVenta = tipo === 'venta';
+    const itemsProcesados = [];
+    let importeTotal = 0;
+
+    for (const it of rawItems) {
+        const cant = Math.max(1, parseInt(it.cantidad) || 1);
+        const unit = parseFloat(it.precio_unitario) || ((parseFloat(it.subtotal) || 0) / cant) || 0;
+        const sub = parseFloat(it.subtotal) || (cant * unit);
+        const nombreProd = (it.producto_nombre || '').trim();
+        if (!nombreProd) continue;
+
+        const prodTarget = await obtenerOCrearProductoMayorista({
+            producto_id: it.producto_id,
+            producto_nombre: nombreProd,
+            precio_unitario: unit
+        });
+
+        const stockActual = parseInt(prodTarget.stock) || 0;
+        const nuevoStock = esVenta
+            ? Math.max(0, stockActual - cant)
+            : (stockActual + cant);
+
+        const updateFields = { stock: nuevoStock };
+        // Si es compra y trae costo/precio unitario > 0, actualizamos el precio de referencia en stock mayorista
+        if (!esVenta && unit > 0) {
+            updateFields.precio = unit;
+        }
+
+        await supabase
+            .from('productos')
+            .update(updateFields)
+            .eq('id', prodTarget.id);
+
+        itemsProcesados.push({
+            producto_id: prodTarget.id,
+            producto_nombre: prodTarget.nombre,
+            cantidad: cant,
+            precio_unitario: unit,
+            subtotal: sub
+        });
+
+        importeTotal += sub;
+    }
+
+    return { itemsProcesados, importeTotal };
+}
+
 // Listar transacciones recientes (Ventas y Compras)
 app.get('/api/mayorista/transacciones', async (req, res) => {
-    const { tipo, limite } = req.query; // tipo: 'ventas', 'compras', o all
-    const limitNum = parseInt(limite) || 30;
+    const { tipo, limite } = req.query;
+    const limitNum = parseInt(limite) || 50;
 
     try {
         let query = supabase
@@ -1110,108 +1402,53 @@ app.get('/api/mayorista/transacciones', async (req, res) => {
         const { data, error } = await query;
         if (error) throw error;
 
-        // Parsear datos de cada transacción
-        const transacciones = (data || []).map(t => {
-            let detalleJson = null;
-            try {
-                detalleJson = t.observaciones ? JSON.parse(t.observaciones) : null;
-            } catch (e) {
-                detalleJson = { texto: t.observaciones };
-            }
-            const esVenta = (t.numero_orden || '').includes('VTA');
-            return {
-                id: t.id,
-                numero: t.numero_orden,
-                tipo: esVenta ? 'venta' : 'compra',
-                fecha: t.fecha,
-                persona: t.cliente_nombre, // Cliente o Proveedor
-                producto: detalleJson?.producto_nombre || 'Producto',
-                cantidad: detalleJson?.cantidad || 1,
-                precio_unitario: detalleJson?.precio_unitario || 0,
-                total: parseFloat(t.total) || 0,
-                estado: t.estado,
-                vendedor: t.vendedor
-            };
-        });
-
+        const transacciones = (data || []).map(parsearOrdenMayorista);
         res.json(transacciones);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Registrar Venta Mayorista: Cliente, Producto, Cantidad, Importe
-// Resta stock del producto en 'incanto_mayorista'
+// Registrar Venta Mayorista (Soporta múltiples productos o 1 producto, descontando de Stock Mayorista)
 app.post('/api/mayorista/ventas', async (req, res) => {
-    const { cliente, producto_id, producto_nombre, cantidad, importe, vendedor } = req.body;
-    const cantNum = parseInt(cantidad) || 1;
-    const totalNum = parseFloat(importe) || 0;
-    const nombreProd = (producto_nombre || '').trim();
+    const { cliente, items, producto_id, producto_nombre, cantidad, precio_unitario, importe, vendedor } = req.body;
+    const clienteLimpio = (cliente || '').trim();
 
-    if (!cliente || !nombreProd || totalNum <= 0) {
-        return res.status(400).json({ error: 'Faltan campos obligatorios: Cliente, Producto e Importe.' });
+    let listaItems = Array.isArray(items) && items.length > 0 ? items : [];
+    if (listaItems.length === 0 && producto_nombre) {
+        const cant = parseInt(cantidad) || 1;
+        const tot = parseFloat(importe) || 0;
+        const unit = parseFloat(precio_unitario) || (tot / cant);
+        listaItems = [{
+            producto_id,
+            producto_nombre,
+            cantidad: cant,
+            precio_unitario: unit,
+            subtotal: tot || (cant * unit)
+        }];
+    }
+
+    if (!clienteLimpio || listaItems.length === 0) {
+        return res.status(400).json({ error: 'Debés indicar el Cliente y al menos un producto para la venta.' });
     }
 
     try {
-        let prodTarget = null;
-        if (producto_id) {
-            const { data: p } = await supabase
-                .from('productos')
-                .select('*')
-                .eq('id', producto_id)
-                .eq('marca', 'incanto_mayorista')
-                .maybeSingle();
-            prodTarget = p;
+        const { itemsProcesados, importeTotal } = await aplicarStockItemsMayorista('venta', listaItems);
+
+        if (itemsProcesados.length === 0) {
+            return res.status(400).json({ error: 'No se encontraron productos válidos en la venta.' });
         }
 
-        // Si no se pasó ID o no se encontró, buscar por nombre exacto en mayorista o crearlo
-        if (!prodTarget) {
-            const { data: pExist } = await supabase
-                .from('productos')
-                .select('*')
-                .eq('marca', 'incanto_mayorista')
-                .ilike('nombre', nombreProd)
-                .maybeSingle();
-
-            if (pExist) {
-                prodTarget = pExist;
-            } else {
-                // Crear producto nuevo en stock mayorista
-                const codigo_sku = `MAY-${Date.now().toString().slice(-6)}`;
-                const { data: pNew, error: pErr } = await supabase
-                    .from('productos')
-                    .insert([{
-                        codigo_sku,
-                        nombre: nombreProd,
-                        variante: 'Mayorista',
-                        precio: totalNum / (cantNum || 1),
-                        stock: 0,
-                        marca: 'incanto_mayorista'
-                    }])
-                    .select()
-                    .single();
-                if (pErr) throw pErr;
-                prodTarget = pNew;
-            }
-        }
-
-        // Descontar stock (no menor a 0)
-        const nuevoStock = Math.max(0, (prodTarget.stock || 0) - cantNum);
-        await supabase
-            .from('productos')
-            .update({ stock: nuevoStock })
-            .eq('id', prodTarget.id);
-
-        // Generar número de venta mayorista único
         const numVenta = `#INC-MAY-VTA-${Date.now().toString().slice(-6)}`;
         const fechaHoy = new Date().toISOString().split('T')[0];
 
         const detalleObj = {
             tipo: 'venta_mayorista',
-            producto_id: prodTarget.id,
-            producto_nombre: prodTarget.nombre,
-            cantidad: cantNum,
-            precio_unitario: totalNum / cantNum
+            items: itemsProcesados,
+            producto_id: itemsProcesados[0].producto_id,
+            producto_nombre: itemsProcesados.map(i => `${i.producto_nombre} (x${i.cantidad})`).join(', '),
+            cantidad: itemsProcesados.reduce((acc, i) => acc + i.cantidad, 0),
+            precio_unitario: itemsProcesados.length === 1 ? itemsProcesados[0].precio_unitario : (importeTotal / itemsProcesados.reduce((acc, i) => acc + i.cantidad, 0))
         };
 
         const { data: orden, error: errOrden } = await supabase
@@ -1220,8 +1457,8 @@ app.post('/api/mayorista/ventas', async (req, res) => {
                 numero_orden: numVenta,
                 fecha: fechaHoy,
                 vendedor: vendedor || 'sistema',
-                cliente_nombre: cliente.trim(),
-                total: totalNum,
+                cliente_nombre: clienteLimpio,
+                total: importeTotal,
                 estado: 'Finalizado',
                 modo_entrega: 'Mayorista',
                 observaciones: JSON.stringify(detalleObj)
@@ -1234,8 +1471,7 @@ app.post('/api/mayorista/ventas', async (req, res) => {
         res.json({
             success: true,
             numero: numVenta,
-            stockRestante: nuevoStock,
-            orden
+            orden: parsearOrdenMayorista(orden)
         });
     } catch (err) {
         console.error('Error al registrar venta mayorista:', err);
@@ -1243,84 +1479,46 @@ app.post('/api/mayorista/ventas', async (req, res) => {
     }
 });
 
-// Registrar Compra Mayorista: Proveedor, Producto, Cantidad, Importe
-// Suma stock al producto en 'incanto_mayorista'
+// Registrar Compra Mayorista (Soporta múltiples productos al proveedor, suma al Stock Mayorista)
 app.post('/api/mayorista/compras', async (req, res) => {
-    const { proveedor, producto_id, producto_nombre, cantidad, importe, vendedor } = req.body;
-    const cantNum = parseInt(cantidad) || 1;
-    const totalNum = parseFloat(importe) || 0;
-    const nombreProd = (producto_nombre || '').trim();
+    const { proveedor, items, producto_id, producto_nombre, cantidad, precio_unitario, importe, vendedor } = req.body;
+    const proveedorLimpio = (proveedor || '').trim();
 
-    if (!proveedor || !nombreProd || totalNum <= 0) {
-        return res.status(400).json({ error: 'Faltan campos obligatorios: Proveedor, Producto e Importe.' });
+    let listaItems = Array.isArray(items) && items.length > 0 ? items : [];
+    if (listaItems.length === 0 && producto_nombre) {
+        const cant = parseInt(cantidad) || 1;
+        const tot = parseFloat(importe) || 0;
+        const unit = parseFloat(precio_unitario) || (tot / cant);
+        listaItems = [{
+            producto_id,
+            producto_nombre,
+            cantidad: cant,
+            precio_unitario: unit,
+            subtotal: tot || (cant * unit)
+        }];
+    }
+
+    if (!proveedorLimpio || listaItems.length === 0) {
+        return res.status(400).json({ error: 'Debés indicar el Proveedor y al menos un producto para la compra.' });
     }
 
     try {
-        let prodTarget = null;
-        if (producto_id) {
-            const { data: p } = await supabase
-                .from('productos')
-                .select('*')
-                .eq('id', producto_id)
-                .eq('marca', 'incanto_mayorista')
-                .maybeSingle();
-            prodTarget = p;
+        const { itemsProcesados, importeTotal } = await aplicarStockItemsMayorista('compra', listaItems);
+
+        if (itemsProcesados.length === 0) {
+            return res.status(400).json({ error: 'No se encontraron productos válidos en la compra.' });
         }
 
-        if (!prodTarget) {
-            const { data: pExist } = await supabase
-                .from('productos')
-                .select('*')
-                .eq('marca', 'incanto_mayorista')
-                .ilike('nombre', nombreProd)
-                .maybeSingle();
-
-            if (pExist) {
-                prodTarget = pExist;
-            } else {
-                // Crear producto nuevo en stock mayorista
-                const codigo_sku = `MAY-${Date.now().toString().slice(-6)}`;
-                const { data: pNew, error: pErr } = await supabase
-                    .from('productos')
-                    .insert([{
-                        codigo_sku,
-                        nombre: nombreProd,
-                        variante: 'Mayorista',
-                        precio: totalNum / (cantNum || 1),
-                        stock: cantNum,
-                        marca: 'incanto_mayorista'
-                    }])
-                    .select()
-                    .single();
-                if (pErr) throw pErr;
-                prodTarget = pNew;
-            }
-        }
-
-        // Si ya existía, sumar stock
-        if (prodTarget && prodTarget.id) {
-            const nuevoStock = (parseInt(prodTarget.stock) || 0) + cantNum;
-            // Actualizar stock y mantener o actualizar precio de referencia
-            await supabase
-                .from('productos')
-                .update({ 
-                    stock: nuevoStock,
-                    precio: prodTarget.precio > 0 ? prodTarget.precio : (totalNum / cantNum)
-                })
-                .eq('id', prodTarget.id);
-            prodTarget.stock = nuevoStock;
-        }
-
-        // Generar número de compra mayorista único
         const numCompra = `#INC-MAY-CMP-${Date.now().toString().slice(-6)}`;
         const fechaHoy = new Date().toISOString().split('T')[0];
 
         const detalleObj = {
             tipo: 'compra_mayorista',
-            producto_id: prodTarget.id,
-            producto_nombre: prodTarget.nombre,
-            cantidad: cantNum,
-            precio_unitario: totalNum / cantNum
+            items: itemsProcesados,
+            producto_id: itemsProcesados[0].producto_id,
+            producto_nombre: itemsProcesados.map(i => `${i.producto_nombre} (x${i.cantidad})`).join(', '),
+            cantidad: itemsProcesados.reduce((acc, i) => acc + i.cantidad, 0),
+            precio_unitario: itemsProcesados.length === 1 ? itemsProcesados[0].precio_unitario : (importeTotal / itemsProcesados.reduce((acc, i) => acc + i.cantidad, 0))
         };
 
         const { data: orden, error: errOrden } = await supabase
@@ -1329,8 +1527,8 @@ app.post('/api/mayorista/compras', async (req, res) => {
                 numero_orden: numCompra,
                 fecha: fechaHoy,
                 vendedor: vendedor || 'sistema',
-                cliente_nombre: proveedor.trim(), // Se guarda el nombre del proveedor en cliente_nombre
-                total: totalNum,
+                cliente_nombre: proveedorLimpio,
+                total: importeTotal,
                 estado: 'Finalizado',
                 modo_entrega: 'Compra',
                 observaciones: JSON.stringify(detalleObj)
@@ -1343,11 +1541,111 @@ app.post('/api/mayorista/compras', async (req, res) => {
         res.json({
             success: true,
             numero: numCompra,
-            stockActual: prodTarget.stock,
-            orden
+            orden: parsearOrdenMayorista(orden)
         });
     } catch (err) {
         console.error('Error al registrar compra mayorista:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Editar una Compra o Venta Mayorista existente (revierte el impacto anterior en Stock Mayorista y aplica el nuevo)
+app.put('/api/mayorista/transacciones/:id', async (req, res) => {
+    const { id } = req.params;
+    const { persona, items, vendedor } = req.body;
+    const personaLimpia = (persona || '').trim();
+
+    if (!personaLimpia || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Debés indicar el Cliente/Proveedor y al menos un producto.' });
+    }
+
+    try {
+        const { data: ordenActual, error: errFetch } = await supabase
+            .from('ordenes')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (errFetch) throw errFetch;
+        if (!ordenActual) {
+            return res.status(404).json({ error: 'Transacción no encontrada.' });
+        }
+
+        const transaccionPrevia = parsearOrdenMayorista(ordenActual);
+
+        // 1. Revertir el stock anterior
+        await revertirStockTransaccionMayorista(transaccionPrevia);
+
+        // 2. Aplicar el nuevo stock
+        const { itemsProcesados, importeTotal } = await aplicarStockItemsMayorista(transaccionPrevia.tipo, items);
+
+        const detalleObj = {
+            tipo: transaccionPrevia.tipo === 'venta' ? 'venta_mayorista' : 'compra_mayorista',
+            items: itemsProcesados,
+            producto_id: itemsProcesados[0]?.producto_id || null,
+            producto_nombre: itemsProcesados.map(i => `${i.producto_nombre} (x${i.cantidad})`).join(', '),
+            cantidad: itemsProcesados.reduce((acc, i) => acc + i.cantidad, 0),
+            precio_unitario: itemsProcesados.length === 1 ? itemsProcesados[0].precio_unitario : (importeTotal / (itemsProcesados.reduce((acc, i) => acc + i.cantidad, 0) || 1))
+        };
+
+        const { data: ordenActualizada, error: errUpd } = await supabase
+            .from('ordenes')
+            .update({
+                cliente_nombre: personaLimpia,
+                total: importeTotal,
+                vendedor: vendedor || ordenActual.vendedor || 'sistema',
+                observaciones: JSON.stringify(detalleObj)
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (errUpd) throw errUpd;
+
+        res.json({
+            success: true,
+            orden: parsearOrdenMayorista(ordenActualizada)
+        });
+    } catch (err) {
+        console.error('Error al editar transacción mayorista:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Eliminar una Compra o Venta Mayorista (revierte automáticamente el stock en Stock Mayorista)
+app.delete('/api/mayorista/transacciones/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const { data: ordenActual, error: errFetch } = await supabase
+            .from('ordenes')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (errFetch) throw errFetch;
+        if (!ordenActual) {
+            return res.status(404).json({ error: 'Transacción no encontrada.' });
+        }
+
+        const transaccionPrevia = parsearOrdenMayorista(ordenActual);
+
+        // 1. Revertir el stock de la compra o venta
+        await revertirStockTransaccionMayorista(transaccionPrevia);
+
+        // 2. Eliminar la orden
+        const { error: errDel } = await supabase
+            .from('ordenes')
+            .delete()
+            .eq('id', id);
+
+        if (errDel) throw errDel;
+
+        res.json({
+            success: true,
+            mensaje: `${transaccionPrevia.tipo === 'venta' ? 'Venta' : 'Compra'} eliminada y stock actualizado.`
+        });
+    } catch (err) {
+        console.error('Error al eliminar transacción mayorista:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -1370,27 +1668,7 @@ app.get('/reporte-mayorista', async (req, res) => {
         const { data: rawTrans, error: errTrans } = await queryTrans;
         if (errTrans) throw errTrans;
 
-        const transacciones = (rawTrans || []).map(t => {
-            let detalleJson = null;
-            try {
-                detalleJson = t.observaciones ? JSON.parse(t.observaciones) : null;
-            } catch (e) {
-                detalleJson = { texto: t.observaciones };
-            }
-            const esVenta = (t.numero_orden || '').includes('VTA');
-            return {
-                id: t.id,
-                numero: t.numero_orden,
-                tipo: esVenta ? 'venta' : 'compra',
-                fecha: t.fecha,
-                persona: t.cliente_nombre,
-                producto: detalleJson?.producto_nombre || 'Producto',
-                cantidad: detalleJson?.cantidad || 1,
-                precio_unitario: detalleJson?.precio_unitario || 0,
-                total: parseFloat(t.total) || 0,
-                vendedor: t.vendedor
-            };
-        });
+        const transacciones = (rawTrans || []).map(parsearOrdenMayorista);
 
         // 2. Obtener productos de stock mayorista
         const { data: productos, error: errProds } = await supabase

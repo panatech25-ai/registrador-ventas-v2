@@ -45,17 +45,31 @@ function generarHTMLReporteMayorista({ transacciones = [], productos = [], cotiz
 
     const valorEstimadoStockUsd = cotizacionMep > 0 ? (valorEstimadoStockArs / cotizacionMep) : 0;
 
-    // 3. Distribución de Ventas por Producto para Gráfico de Torta
+    // 3. Distribución de Ventas por Producto para Gráfico de Torta (soporta ventas multi-producto)
     const productosVentasMap = new Map();
     ventas.forEach(v => {
-        const prod = v.producto || 'Otros';
-        const monto = parseFloat(v.total) || 0;
-        const cant = parseInt(v.cantidad) || 1;
-        if (!productosVentasMap.has(prod)) {
-            productosVentasMap.set(prod, { total: 0, cantidad: 0 });
+        if (Array.isArray(v.items) && v.items.length > 0) {
+            v.items.forEach(it => {
+                const prod = it.producto_nombre || 'Otros';
+                const cant = parseInt(it.cantidad) || 1;
+                const unit = parseFloat(it.precio_unitario) || 0;
+                const monto = parseFloat(it.subtotal) || (cant * unit);
+                if (!productosVentasMap.has(prod)) {
+                    productosVentasMap.set(prod, { total: 0, cantidad: 0 });
+                }
+                productosVentasMap.get(prod).total += monto;
+                productosVentasMap.get(prod).cantidad += cant;
+            });
+        } else {
+            const prod = v.producto || 'Otros';
+            const monto = parseFloat(v.total) || 0;
+            const cant = parseInt(v.cantidad) || 1;
+            if (!productosVentasMap.has(prod)) {
+                productosVentasMap.set(prod, { total: 0, cantidad: 0 });
+            }
+            productosVentasMap.get(prod).total += monto;
+            productosVentasMap.get(prod).cantidad += cant;
         }
-        productosVentasMap.get(prod).total += monto;
-        productosVentasMap.get(prod).cantidad += cant;
     });
 
     const productosRanking = Array.from(productosVentasMap.entries())

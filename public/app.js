@@ -2522,13 +2522,22 @@ async function eliminarUsuario(username) {
 let cotizacionDolarMep = 1540;
 let modoMonedaMayorista = 'ARS'; // 'ARS' o 'USD'
 let metricasMayoristaMemoria = { ventasMes: 0, cantidadSplash: 0, valorEstimado: 0 };
-let productosMayoristaMemoria = [];
+let productosMayoristaMemoria = []; // Stock Mayorista (marca: incanto_mayorista)
+let catalogoOrigenIncantoMemoria = []; // Catálogo completo de Incanto para elegir al comprar
+let transaccionesMayoristaMemoria = [];
+
+let carritoVentaMayorista = [];
+let carritoCompraMayorista = [];
+let filtroTextoStockMayorista = '';
 
 async function inicializarModuloMayorista() {
-    await cargarCotizacionMep();
-    await cargarMetricasMayorista();
-    await cargarProductosMayorista();
-    await cargarTransaccionesMayorista();
+    await Promise.all([
+        cargarCotizacionMep(),
+        cargarMetricasMayorista(),
+        cargarProductosMayorista(),
+        cargarCatalogoOrigenMayorista(),
+        cargarTransaccionesMayorista()
+    ]);
 }
 
 // Cargar Dólar MEP
@@ -2604,91 +2613,449 @@ function actualizarValorEstimadoDisplay() {
     }
 }
 
-// Catálogo propio de productos mayorista
+// Cargar Stock Mayorista propio (`incanto_mayorista`) y renderizar el módulo Stock Mayorista
 async function cargarProductosMayorista() {
     try {
         const res = await fetch('/api/mayorista/productos');
         const data = await res.json();
-        productosMayoristaMemoria = data || [];
+        productosMayoristaMemoria = Array.isArray(data) ? data : [];
+        renderizarStockMayoristaModulo();
     } catch (err) {
-        console.error('Error al cargar catálogo mayorista:', err);
+        console.error('Error al cargar stock mayorista:', err);
     }
 }
 
-// Autocompletado de productos para Ventas y Compras
+// Cargar catálogo base de productos de Incanto para el selector de Compras Mayoristas
+async function cargarCatalogoOrigenMayorista() {
+    try {
+        const res = await fetch('/api/mayorista/catalogo-origen');
+        const data = await res.json();
+        catalogoOrigenIncantoMemoria = Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error('Error al cargar catálogo origen Incanto:', err);
+    }
+}
+
+function filtrarVistaStockMayorista(val) {
+    filtroTextoStockMayorista = (val || '').trim().toLowerCase();
+    renderizarStockMayoristaModulo();
+}
+
+function renderizarStockMayoristaModulo() {
+    const grid = document.getElementById('contenedorStockMayoristaGrid');
+    const badge = document.getElementById('badgeCountStockMayorista');
+    if (!grid) return;
+
+    const conStockTotal = productosMayoristaMemoria.reduce((acc, p) => acc + (parseInt(p.stock) || 0), 0);
+    if (badge) {
+        badge.textContent = `${productosMayoristaMemoria.length} prod. (${conStockTotal} un.)`;
+    }
+
+    let filtrados = productosMayoristaMemoria;
+    if (filtroTextoStockMayorista) {
+        filtrados = filtrados.filter(p =>
+            (p.nombre || '').toLowerCase().includes(filtroTextoStockMayorista) ||
+            (p.codigo_sku || '').toLowerCase().includes(filtroTextoStockMayorista)
+        );
+    }
+
+    if (filtrados.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full py-6 text-center text-xs text-slate-400 italic bg-slate-900/50 rounded-xl border border-slate-800">
+                ${productosMayoristaMemoria.length === 0
+                    ? 'Aún no hay productos cargados en el Stock Mayorista. Registrá una Compra Mayorista abajo para sumar stock.'
+                    : 'No se encontraron productos en el Stock Mayorista con ese filtro.'}
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = filtrados.map(p => {
+        const stock = parseInt(p.stock) || 0;
+        const precio = parseFloat(p.precio) || 0;
+        const badgeColor = stock > 0
+            ? 'bg-emerald-950/90 text-emerald-400 border-emerald-700/60'
+            : 'bg-rose-950/90 text-rose-400 border-rose-700/60';
+
+        return `
+            <div class="bg-slate-900/90 border border-slate-700/70 hover:border-pink-500/40 p-2.5 rounded-xl flex items-center justify-between gap-2.5 text-xs transition shadow-sm">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <img src="${p.imagen_url || '/img/no-image.svg'}" onerror="this.onerror=null;this.src='/img/no-image.svg';" class="w-10 h-10 rounded-lg object-contain bg-slate-950 border border-slate-800 shrink-0">
+                    <div class="min-w-0">
+                        <strong class="text-white block truncate" title="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</strong>
+                        <span class="text-[10px] text-slate-400 block">Ref: <b class="text-emerald-400">$${precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</b></span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="px-2 py-1 rounded-lg border text-[11px] font-black ${badgeColor}">
+                        ${stock} un.
+                    </span>
+                    <button type="button" onclick="seleccionarRapidoDesdeStockMayorista(${p.id})" title="Vender este producto" class="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 p-1.5 rounded-lg text-[11px] transition">
+                        🛍️
+                    </button>
+                    <button type="button" onclick="eliminarProductoStockMayorista(${p.id}, '${escapeHtml(p.nombre)}')" title="Quitar del Stock Mayorista" class="bg-slate-800 hover:bg-rose-900/80 text-slate-400 hover:text-rose-200 border border-slate-700 p-1.5 rounded-lg text-[11px] transition">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function seleccionarRapidoDesdeStockMayorista(id) {
+    const prod = productosMayoristaMemoria.find(p => String(p.id) === String(id));
+    if (!prod) return;
+    seleccionarProductoMayorista('venta', prod.id, prod.nombre, prod.precio || 0, prod.stock || 0);
+    document.getElementById('mayVentaCantidad')?.focus();
+    showToast(`Producto "${prod.nombre}" seleccionado para la venta.`, 'info');
+}
+
+async function eliminarProductoStockMayorista(id, nombre) {
+    if (!confirm(`¿Seguro que querés quitar "${nombre}" del Stock Mayorista?`)) return;
+    try {
+        const res = await fetch(`/api/mayorista/productos/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Producto eliminado del Stock Mayorista.', 'info');
+            await cargarProductosMayorista();
+            await cargarMetricasMayorista();
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo eliminar'), 'error');
+        }
+    } catch (err) {
+        showToast('Error de red al eliminar producto.', 'error');
+    }
+}
+
+// Autocompletado de productos:
+// - En VENTA ('venta'): utiliza exclusivamente el Stock Mayorista (`productosMayoristaMemoria`)
+// - En COMPRA ('compra'): permite elegir todos los productos de Incanto (`catalogoOrigenIncantoMemoria`) o escribir uno nuevo
 function filtrarProductosMayorista(tipo, texto) {
     const query = (texto || '').toLowerCase().trim();
     const contenedorId = tipo === 'venta' ? 'sugerenciasMayVenta' : 'sugerenciasMayCompra';
     const container = document.getElementById(contenedorId);
     if (!container) return;
 
-    // Resetear ID seleccionado al tipear
     const hiddenId = tipo === 'venta' ? document.getElementById('mayVentaProductoId') : document.getElementById('mayCompraProductoId');
     if (hiddenId) hiddenId.value = '';
 
-    if (!query) {
-        container.classList.add('hidden');
-        return;
-    }
+    if (tipo === 'venta') {
+        // Para Venta: filtrar del Stock Mayorista
+        const lista = query
+            ? productosMayoristaMemoria.filter(p =>
+                (p.nombre || '').toLowerCase().includes(query) ||
+                (p.codigo_sku || '').toLowerCase().includes(query)
+            )
+            : productosMayoristaMemoria.slice(0, 30);
 
-    const coincidencias = productosMayoristaMemoria.filter(p =>
-        (p.nombre || '').toLowerCase().includes(query) || (p.codigo_sku || '').toLowerCase().includes(query)
-    );
+        if (lista.length === 0) {
+            container.innerHTML = `
+                <div class="p-3 text-xs text-slate-400 italic text-center">
+                    No hay productos coincidentes en el <b>Stock Mayorista</b>.<br>
+                    Cargalos primero en "Compra Mayorista".
+                </div>
+            `;
+            container.classList.remove('hidden');
+            return;
+        }
 
-    if (coincidencias.length === 0) {
-        container.innerHTML = `
-            <div class="p-2.5 text-xs text-slate-400 italic">
-                Nuevo producto: se registrará en el stock mayorista.
+        container.innerHTML = lista.slice(0, 30).map(p => `
+            <div onclick="seleccionarProductoMayorista('venta', ${p.id}, '${escapeHtml(p.nombre)}', ${p.precio || 0}, ${p.stock || 0})" class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 last:border-b-0 flex justify-between items-center gap-2 text-xs">
+                <div class="flex items-center gap-2 min-w-0">
+                    <img src="${p.imagen_url || '/img/no-image.svg'}" onerror="this.onerror=null;this.src='/img/no-image.svg';" class="w-8 h-8 rounded object-contain bg-slate-950 border border-slate-800 shrink-0">
+                    <div class="min-w-0">
+                        <strong class="text-white block truncate">${escapeHtml(p.nombre)}</strong>
+                        <span class="text-[10px] text-slate-400">Stock Mayorista: <span class="${(p.stock || 0) > 0 ? 'text-emerald-400' : 'text-rose-400'} font-bold">${p.stock || 0} un.</span></span>
+                    </div>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="text-xs font-bold text-rose-400">$${(parseFloat(p.precio) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                </div>
             </div>
-        `;
+        `).join('');
         container.classList.remove('hidden');
-        return;
-    }
+    } else {
+        // Para Compra: buscar en el catálogo completo de Incanto (y Stock Mayorista)
+        if (!query && catalogoOrigenIncantoMemoria.length === 0) {
+            container.classList.add('hidden');
+            return;
+        }
 
-    container.innerHTML = coincidencias.map(p => `
-        <div onclick="seleccionarProductoMayorista('${tipo}', ${p.id}, '${escapeHtml(p.nombre)}', ${p.precio || 0}, ${p.stock || 0})" class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 last:border-b-0 flex justify-between items-center text-xs">
-            <div>
-                <strong class="text-white block">${escapeHtml(p.nombre)}</strong>
-                <span class="text-[10px] text-slate-400">Stock: <span class="text-pink-400 font-bold">${p.stock} un.</span></span>
-            </div>
-            <div class="text-right">
-                <span class="text-xs font-bold text-emerald-400">$${(parseFloat(p.precio) || 0).toFixed(2)}</span>
-            </div>
-        </div>
-    `).join('');
-    container.classList.remove('hidden');
+        const fuente = catalogoOrigenIncantoMemoria.length > 0 ? catalogoOrigenIncantoMemoria : productosMayoristaMemoria;
+        const coincidencias = query
+            ? fuente.filter(p =>
+                (p.nombre || '').toLowerCase().includes(query) ||
+                (p.codigo_sku || '').toLowerCase().includes(query)
+            ).slice(0, 35)
+            : fuente.slice(0, 25);
+
+        if (coincidencias.length === 0) {
+            container.innerHTML = `
+                <div class="p-2.5 text-xs text-emerald-300 italic">
+                    ✨ Producto nuevo: se agregará al Stock Mayorista al registrar la compra.
+                </div>
+            `;
+            container.classList.remove('hidden');
+            return;
+        }
+
+        container.innerHTML = coincidencias.map(p => {
+            const idMay = p.mayorista_id || p.id || '';
+            const precioRef = parseFloat(p.precio_referencia !== undefined ? p.precio_referencia : p.precio) || 0;
+            const stockMay = parseInt(p.stock_mayorista !== undefined ? p.stock_mayorista : p.stock) || 0;
+            return `
+                <div onclick="seleccionarProductoMayorista('compra', '${idMay}', '${escapeHtml(p.nombre)}', ${precioRef}, ${stockMay})" class="p-2.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800 last:border-b-0 flex justify-between items-center gap-2 text-xs">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <img src="${p.imagen_url || '/img/no-image.svg'}" onerror="this.onerror=null;this.src='/img/no-image.svg';" class="w-8 h-8 rounded object-contain bg-slate-950 border border-slate-800 shrink-0">
+                        <div class="min-w-0">
+                            <strong class="text-white block truncate">${escapeHtml(p.nombre)}</strong>
+                            <span class="text-[10px] text-slate-400">En Stock Mayorista: <span class="text-pink-400 font-bold">${stockMay} un.</span></span>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="text-[10px] text-slate-400 block">Precio Ref.</span>
+                        <span class="text-xs font-bold text-emerald-400">$${precioRef.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        container.classList.remove('hidden');
+    }
 }
 
 function seleccionarProductoMayorista(tipo, id, nombre, precio, stock) {
-    const inputNombre = tipo === 'venta' ? document.getElementById('mayVentaProducto') : document.getElementById('mayCompraProducto');
-    const inputId = tipo === 'venta' ? document.getElementById('mayVentaProductoId') : document.getElementById('mayCompraProductoId');
-    const inputCant = tipo === 'venta' ? document.getElementById('mayVentaCantidad') : document.getElementById('mayCompraCantidad');
-    const inputImporte = tipo === 'venta' ? document.getElementById('mayVentaImporte') : document.getElementById('mayCompraImporte');
+    const pref = tipo === 'venta' ? 'mayVenta' : 'mayCompra';
+    const inputNombre = document.getElementById(`${pref}Producto`);
+    const inputId = document.getElementById(`${pref}ProductoId`);
+    const inputCant = document.getElementById(`${pref}Cantidad`);
+    const inputUnitario = document.getElementById(`${pref}PrecioUnitario`);
+    const inputImporte = document.getElementById(`${pref}Importe`);
     const contenedorId = tipo === 'venta' ? 'sugerenciasMayVenta' : 'sugerenciasMayCompra';
 
     if (inputNombre) inputNombre.value = nombre;
-    if (inputId) inputId.value = id;
+    if (inputId) inputId.value = id || '';
 
-    // Calcular importe automático si hay precio
-    const cant = parseInt(inputCant?.value) || 1;
-    if (inputImporte && precio > 0) {
-        inputImporte.value = (precio * cant).toFixed(2);
+    const cant = Math.max(1, parseInt(inputCant?.value) || 1);
+    const unit = parseFloat(precio) || 0;
+
+    if (inputUnitario && unit > 0) {
+        inputUnitario.value = unit.toFixed(2);
+    }
+    if (inputImporte && unit > 0) {
+        inputImporte.value = (unit * cant).toFixed(2);
     }
 
     document.getElementById(contenedorId)?.classList.add('hidden');
 }
 
-// Registrar Venta Mayorista
+// Cerrar desplegables de sugerencias mayoristas al hacer clic fuera
+document.addEventListener('click', (e) => {
+    const sugVenta = document.getElementById('sugerenciasMayVenta');
+    const inpVenta = document.getElementById('mayVentaProducto');
+    if (sugVenta && !sugVenta.contains(e.target) && e.target !== inpVenta) {
+        sugVenta.classList.add('hidden');
+    }
+    const sugCompra = document.getElementById('sugerenciasMayCompra');
+    const inpCompra = document.getElementById('mayCompraProducto');
+    if (sugCompra && !sugCompra.contains(e.target) && e.target !== inpCompra) {
+        sugCompra.classList.add('hidden');
+    }
+});
+
+// Recalcular automáticamente Importe Total = Cantidad * Importe por Unidad
+function recalcularSubtotalItemMayorista(tipo) {
+    const pref = tipo === 'venta' ? 'mayVenta' : 'mayCompra';
+    const cant = Math.max(1, parseInt(document.getElementById(`${pref}Cantidad`)?.value) || 1);
+    const unit = parseFloat(document.getElementById(`${pref}PrecioUnitario`)?.value);
+    const inputTotal = document.getElementById(`${pref}Importe`);
+
+    if (!isNaN(unit) && unit >= 0 && inputTotal) {
+        inputTotal.value = (cant * unit).toFixed(2);
+    }
+}
+
+// Si el usuario escribe directamente el Importe Total, calcular el Importe por Unidad
+function recalcularUnitarioDesdeTotalMayorista(tipo) {
+    const pref = tipo === 'venta' ? 'mayVenta' : 'mayCompra';
+    const cant = Math.max(1, parseInt(document.getElementById(`${pref}Cantidad`)?.value) || 1);
+    const total = parseFloat(document.getElementById(`${pref}Importe`)?.value);
+    const inputUnit = document.getElementById(`${pref}PrecioUnitario`);
+
+    if (!isNaN(total) && total >= 0 && inputUnit) {
+        inputUnit.value = (total / cant).toFixed(2);
+    }
+}
+
+// Agregar un producto a la lista de la Venta o Compra actual
+function agregarItemCarritoMayorista(tipo) {
+    const pref = tipo === 'venta' ? 'mayVenta' : 'mayCompra';
+    const inputNombre = document.getElementById(`${pref}Producto`);
+    const inputId = document.getElementById(`${pref}ProductoId`);
+    const inputCant = document.getElementById(`${pref}Cantidad`);
+    const inputUnit = document.getElementById(`${pref}PrecioUnitario`);
+    const inputTotal = document.getElementById(`${pref}Importe`);
+
+    const nombre = (inputNombre?.value || '').trim();
+    const prodId = inputId?.value || null;
+    const cantidad = Math.max(1, parseInt(inputCant?.value) || 1);
+    let precioUnitario = parseFloat(inputUnit?.value) || 0;
+    let subtotal = parseFloat(inputTotal?.value) || 0;
+
+    if (!nombre) {
+        showToast('Seleccioná o escribí un producto primero.', 'warning');
+        inputNombre?.focus();
+        return false;
+    }
+
+    if (precioUnitario > 0 && subtotal <= 0) {
+        subtotal = cantidad * precioUnitario;
+    } else if (subtotal > 0 && precioUnitario <= 0) {
+        precioUnitario = subtotal / cantidad;
+    }
+
+    if (subtotal <= 0) {
+        showToast('Ingresá el Importe por Unidad o el Importe Total.', 'warning');
+        inputUnit?.focus();
+        return false;
+    }
+
+    // Si es Venta, verificar que el producto exista en Stock Mayorista
+    let idFinal = prodId;
+    if (tipo === 'venta' && !idFinal) {
+        const matchStock = productosMayoristaMemoria.find(p => (p.nombre || '').toLowerCase().trim() === nombre.toLowerCase());
+        if (matchStock) {
+            idFinal = matchStock.id;
+        } else {
+            showToast('Elegí un producto disponible en el Stock Mayorista.', 'warning');
+            return false;
+        }
+    }
+
+    const listaTarget = tipo === 'venta' ? carritoVentaMayorista : carritoCompraMayorista;
+
+    // Si ya estaba el mismo producto en la lista, sumar cantidad y subtotal
+    const idxExist = listaTarget.findIndex(it =>
+        (idFinal && String(it.producto_id) === String(idFinal)) ||
+        it.producto_nombre.toLowerCase() === nombre.toLowerCase()
+    );
+
+    if (idxExist >= 0) {
+        listaTarget[idxExist].cantidad += cantidad;
+        listaTarget[idxExist].subtotal += subtotal;
+        listaTarget[idxExist].precio_unitario = listaTarget[idxExist].subtotal / listaTarget[idxExist].cantidad;
+    } else {
+        listaTarget.push({
+            producto_id: idFinal,
+            producto_nombre: nombre,
+            cantidad,
+            precio_unitario: precioUnitario,
+            subtotal
+        });
+    }
+
+    // Limpiar inputs de ítem para poder agregar otro producto
+    if (inputNombre) inputNombre.value = '';
+    if (inputId) inputId.value = '';
+    if (inputCant) inputCant.value = 1;
+    if (inputUnit) inputUnit.value = '';
+    if (inputTotal) inputTotal.value = '';
+
+    renderizarCarritoMayorista(tipo);
+    inputNombre?.focus();
+    return true;
+}
+
+function quitarItemCarritoMayorista(tipo, idx) {
+    if (tipo === 'venta') {
+        carritoVentaMayorista.splice(idx, 1);
+    } else {
+        carritoCompraMayorista.splice(idx, 1);
+    }
+    renderizarCarritoMayorista(tipo);
+}
+
+function actualizarCantidadItemCarritoMayorista(tipo, idx, nuevaCant) {
+    const lista = tipo === 'venta' ? carritoVentaMayorista : carritoCompraMayorista;
+    if (!lista[idx]) return;
+    const cant = Math.max(1, parseInt(nuevaCant) || 1);
+    lista[idx].cantidad = cant;
+    lista[idx].subtotal = cant * (parseFloat(lista[idx].precio_unitario) || 0);
+    renderizarCarritoMayorista(tipo);
+}
+
+function actualizarUnitarioItemCarritoMayorista(tipo, idx, nuevoUnit) {
+    const lista = tipo === 'venta' ? carritoVentaMayorista : carritoCompraMayorista;
+    if (!lista[idx]) return;
+    const unit = Math.max(0, parseFloat(nuevoUnit) || 0);
+    lista[idx].precio_unitario = unit;
+    lista[idx].subtotal = (parseInt(lista[idx].cantidad) || 1) * unit;
+    renderizarCarritoMayorista(tipo);
+}
+
+function renderizarCarritoMayorista(tipo) {
+    const esVenta = tipo === 'venta';
+    const lista = esVenta ? carritoVentaMayorista : carritoCompraMayorista;
+    const contenedor = document.getElementById(esVenta ? 'contenedorItemsVentaMayorista' : 'contenedorItemsCompraMayorista');
+    const listaDom = document.getElementById(esVenta ? 'listaCarritoVentaMayorista' : 'listaCarritoCompraMayorista');
+    const resumenDom = document.getElementById(esVenta ? 'resumenTotalVentaMayorista' : 'resumenTotalCompraMayorista');
+
+    if (!contenedor || !listaDom) return;
+
+    if (lista.length === 0) {
+        contenedor.classList.add('hidden');
+        listaDom.innerHTML = '';
+        if (resumenDom) resumenDom.textContent = 'Total: $0.00';
+        return;
+    }
+
+    contenedor.classList.remove('hidden');
+    const totalGral = lista.reduce((acc, it) => acc + (parseFloat(it.subtotal) || 0), 0);
+    if (resumenDom) {
+        resumenDom.textContent = `Total (${lista.length} prod.): $${totalGral.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    listaDom.innerHTML = lista.map((it, idx) => `
+        <div class="bg-slate-950/90 border border-slate-800 px-2.5 py-2 rounded-lg flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-xs">
+            <div class="min-w-0 flex-1">
+                <strong class="text-white block truncate">${escapeHtml(it.producto_nombre)}</strong>
+                <span class="text-[10px] text-slate-400">
+                    ${it.cantidad} un. × $${(parseFloat(it.precio_unitario) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })} c/u
+                </span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <input type="number" min="1" value="${it.cantidad}" onchange="actualizarCantidadItemCarritoMayorista('${tipo}', ${idx}, this.value)" class="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-center text-xs text-white" title="Cantidad">
+                <input type="number" step="0.01" value="${(parseFloat(it.precio_unitario) || 0).toFixed(2)}" onchange="actualizarUnitarioItemCarritoMayorista('${tipo}', ${idx}, this.value)" class="w-24 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-right text-xs text-white" title="Importe por unidad">
+                <span class="font-bold ${esVenta ? 'text-rose-400' : 'text-emerald-400'} min-w-[80px] text-right">
+                    $${(parseFloat(it.subtotal) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </span>
+                <button type="button" onclick="quitarItemCarritoMayorista('${tipo}', ${idx})" class="text-slate-400 hover:text-rose-400 font-bold px-1.5" title="Quitar producto">✕</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Registrar o Editar Venta Mayorista
 async function guardarVentaMayorista(e) {
     e.preventDefault();
     const cliente = document.getElementById('mayVentaCliente').value.trim();
-    const producto_nombre = document.getElementById('mayVentaProducto').value.trim();
-    const producto_id = document.getElementById('mayVentaProductoId').value;
-    const cantidad = parseInt(document.getElementById('mayVentaCantidad').value) || 1;
-    const importe = parseFloat(document.getElementById('mayVentaImporte').value) || 0;
+    const editId = document.getElementById('mayVentaEditOrdenId')?.value || '';
 
-    if (!cliente || !producto_nombre || importe <= 0) {
-        showToast('Completá todos los campos de la venta.', 'warning');
+    // Si el usuario dejó un producto cargado en los inputs sin apretar "+", lo sumamos automáticamente
+    const prodInputPendiente = (document.getElementById('mayVentaProducto')?.value || '').trim();
+    const importePendiente = parseFloat(document.getElementById('mayVentaImporte')?.value) || 0;
+    const unitPendiente = parseFloat(document.getElementById('mayVentaPrecioUnitario')?.value) || 0;
+    if (prodInputPendiente && (importePendiente > 0 || unitPendiente > 0)) {
+        const ok = agregarItemCarritoMayorista('venta');
+        if (!ok) return;
+    }
+
+    if (!cliente) {
+        showToast('Ingresá el nombre del cliente.', 'warning');
+        return;
+    }
+
+    if (carritoVentaMayorista.length === 0) {
+        showToast('Agregá al menos un producto del Stock Mayorista a la venta.', 'warning');
         return;
     }
 
@@ -2696,50 +3063,60 @@ async function guardarVentaMayorista(e) {
     if (btn) btn.disabled = true;
 
     try {
-        const res = await fetch('/api/mayorista/ventas', {
-            method: 'POST',
+        const url = editId ? `/api/mayorista/transacciones/${editId}` : '/api/mayorista/ventas';
+        const method = editId ? 'PUT' : 'POST';
+        const payload = editId
+            ? { persona: cliente, items: carritoVentaMayorista, vendedor: USUARIO_ACTUAL }
+            : { cliente, items: carritoVentaMayorista, vendedor: USUARIO_ACTUAL };
+
+        const res = await fetch(url, {
+            method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                cliente,
-                producto_id: producto_id || null,
-                producto_nombre,
-                cantidad,
-                importe,
-                vendedor: USUARIO_ACTUAL
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
         if (data.success) {
-            showToast(`¡Venta Mayorista ${data.numero} registrada con éxito!`, 'success');
-            document.getElementById('formVentaMayorista').reset();
-            document.getElementById('mayVentaProductoId').value = '';
-            document.getElementById('mayVentaCantidad').value = 1;
-            // Recargar datos
-            await cargarMetricasMayorista();
-            await cargarProductosMayorista();
-            await cargarTransaccionesMayorista();
+            showToast(editId ? '¡Venta Mayorista actualizada con éxito!' : `¡Venta Mayorista ${data.numero} registrada!`, 'success');
+            cancelarEdicionMayorista('venta');
+            await Promise.all([
+                cargarMetricasMayorista(),
+                cargarProductosMayorista(),
+                cargarCatalogoOrigenMayorista(),
+                cargarTransaccionesMayorista()
+            ]);
         } else {
             showToast('Error: ' + (data.error || 'No se pudo guardar la venta'), 'error');
         }
     } catch (err) {
-        showToast('Error de red al registrar venta.', 'error');
+        showToast('Error de red al guardar la venta.', 'error');
     } finally {
         if (btn) btn.disabled = false;
     }
 }
 
-// Registrar Compra Mayorista
+// Registrar o Editar Compra Mayorista
 async function guardarCompraMayorista(e) {
     e.preventDefault();
     const proveedor = document.getElementById('mayCompraProveedor').value.trim();
-    const producto_nombre = document.getElementById('mayCompraProducto').value.trim();
-    const producto_id = document.getElementById('mayCompraProductoId').value;
-    const cantidad = parseInt(document.getElementById('mayCompraCantidad').value) || 1;
-    const importe = parseFloat(document.getElementById('mayCompraImporte').value) || 0;
+    const editId = document.getElementById('mayCompraEditOrdenId')?.value || '';
 
-    if (!proveedor || !producto_nombre || importe <= 0) {
-        showToast('Completá todos los campos de la compra.', 'warning');
+    // Si el usuario dejó un producto en los inputs sin apretar "+", agregarlo automáticamente
+    const prodInputPendiente = (document.getElementById('mayCompraProducto')?.value || '').trim();
+    const importePendiente = parseFloat(document.getElementById('mayCompraImporte')?.value) || 0;
+    const unitPendiente = parseFloat(document.getElementById('mayCompraPrecioUnitario')?.value) || 0;
+    if (prodInputPendiente && (importePendiente > 0 || unitPendiente > 0)) {
+        const ok = agregarItemCarritoMayorista('compra');
+        if (!ok) return;
+    }
+
+    if (!proveedor) {
+        showToast('Ingresá el nombre del proveedor.', 'warning');
+        return;
+    }
+
+    if (carritoCompraMayorista.length === 0) {
+        showToast('Agregá al menos un producto a la compra.', 'warning');
         return;
     }
 
@@ -2747,72 +3124,196 @@ async function guardarCompraMayorista(e) {
     if (btn) btn.disabled = true;
 
     try {
-        const res = await fetch('/api/mayorista/compras', {
-            method: 'POST',
+        const url = editId ? `/api/mayorista/transacciones/${editId}` : '/api/mayorista/compras';
+        const method = editId ? 'PUT' : 'POST';
+        const payload = editId
+            ? { persona: proveedor, items: carritoCompraMayorista, vendedor: USUARIO_ACTUAL }
+            : { proveedor, items: carritoCompraMayorista, vendedor: USUARIO_ACTUAL };
+
+        const res = await fetch(url, {
+            method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                proveedor,
-                producto_id: producto_id || null,
-                producto_nombre,
-                cantidad,
-                importe,
-                vendedor: USUARIO_ACTUAL
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
         if (data.success) {
-            showToast(`¡Compra Mayorista ${data.numero} registrada con éxito!`, 'success');
-            document.getElementById('formCompraMayorista').reset();
-            document.getElementById('mayCompraProductoId').value = '';
-            document.getElementById('mayCompraCantidad').value = 1;
-            // Recargar datos
-            await cargarMetricasMayorista();
-            await cargarProductosMayorista();
-            await cargarTransaccionesMayorista();
+            showToast(editId ? '¡Compra Mayorista actualizada con éxito!' : `¡Compra Mayorista ${data.numero} registrada!`, 'success');
+            cancelarEdicionMayorista('compra');
+            await Promise.all([
+                cargarMetricasMayorista(),
+                cargarProductosMayorista(),
+                cargarCatalogoOrigenMayorista(),
+                cargarTransaccionesMayorista()
+            ]);
         } else {
-            showToast('Error: ' + (data.error || 'No se pudo registrar compra'), 'error');
+            showToast('Error: ' + (data.error || 'No se pudo guardar la compra'), 'error');
         }
     } catch (err) {
-        showToast('Error de red al registrar compra.', 'error');
+        showToast('Error de red al guardar la compra.', 'error');
     } finally {
         if (btn) btn.disabled = false;
     }
 }
 
-// Cargar y mostrar historial de Ventas y Compras
+// Cargar una Venta o Compra existente en su formulario para editarla
+function editarTransaccionMayorista(id) {
+    const trans = transaccionesMayoristaMemoria.find(t => String(t.id) === String(id));
+    if (!trans) return;
+
+    const esVenta = trans.tipo === 'venta';
+    const itemsCopia = (trans.items && trans.items.length > 0)
+        ? trans.items.map(it => ({
+            producto_id: it.producto_id || null,
+            producto_nombre: it.producto_nombre,
+            cantidad: parseInt(it.cantidad) || 1,
+            precio_unitario: parseFloat(it.precio_unitario) || 0,
+            subtotal: parseFloat(it.subtotal) || ((parseInt(it.cantidad) || 1) * (parseFloat(it.precio_unitario) || 0))
+        }))
+        : [{
+            producto_id: null,
+            producto_nombre: trans.producto || 'Producto',
+            cantidad: parseInt(trans.cantidad) || 1,
+            precio_unitario: parseFloat(trans.precio_unitario) || 0,
+            subtotal: parseFloat(trans.total) || 0
+        }];
+
+    if (esVenta) {
+        document.getElementById('mayVentaEditOrdenId').value = trans.id;
+        document.getElementById('mayVentaCliente').value = trans.persona || '';
+        carritoVentaMayorista = itemsCopia;
+        renderizarCarritoMayorista('venta');
+
+        const titulo = document.getElementById('tituloFormVentaMayorista');
+        if (titulo) titulo.innerHTML = `✏️ Editando Venta <span class="text-amber-400">${trans.numero}</span>`;
+        const txtBtn = document.getElementById('textoBtnGuardarVentaMay');
+        if (txtBtn) txtBtn.textContent = 'Guardar Cambios de Venta';
+        document.getElementById('btnCancelarEdicionVentaMay')?.classList.remove('hidden');
+        document.getElementById('cardFormVentaMayorista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        document.getElementById('mayCompraEditOrdenId').value = trans.id;
+        document.getElementById('mayCompraProveedor').value = trans.persona || '';
+        carritoCompraMayorista = itemsCopia;
+        renderizarCarritoMayorista('compra');
+
+        const titulo = document.getElementById('tituloFormCompraMayorista');
+        if (titulo) titulo.innerHTML = `✏️ Editando Compra <span class="text-amber-400">${trans.numero}</span>`;
+        const txtBtn = document.getElementById('textoBtnGuardarCompraMay');
+        if (txtBtn) txtBtn.textContent = 'Guardar Cambios de Compra';
+        document.getElementById('btnCancelarEdicionCompraMay')?.classList.remove('hidden');
+        document.getElementById('cardFormCompraMayorista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    showToast(`Editando ${esVenta ? 'venta' : 'compra'} ${trans.numero}`, 'info');
+}
+
+function cancelarEdicionMayorista(tipo) {
+    if (tipo === 'venta') {
+        document.getElementById('formVentaMayorista')?.reset();
+        document.getElementById('mayVentaEditOrdenId').value = '';
+        document.getElementById('mayVentaProductoId').value = '';
+        document.getElementById('mayVentaCantidad').value = 1;
+        carritoVentaMayorista = [];
+        renderizarCarritoMayorista('venta');
+
+        const titulo = document.getElementById('tituloFormVentaMayorista');
+        if (titulo) titulo.textContent = 'Cargar Venta Mayorista';
+        const txtBtn = document.getElementById('textoBtnGuardarVentaMay');
+        if (txtBtn) txtBtn.textContent = 'Registrar Venta';
+        document.getElementById('btnCancelarEdicionVentaMay')?.classList.add('hidden');
+    } else {
+        document.getElementById('formCompraMayorista')?.reset();
+        document.getElementById('mayCompraEditOrdenId').value = '';
+        document.getElementById('mayCompraProductoId').value = '';
+        document.getElementById('mayCompraCantidad').value = 1;
+        carritoCompraMayorista = [];
+        renderizarCarritoMayorista('compra');
+
+        const titulo = document.getElementById('tituloFormCompraMayorista');
+        if (titulo) titulo.textContent = 'Cargar Compra Mayorista';
+        const txtBtn = document.getElementById('textoBtnGuardarCompraMay');
+        if (txtBtn) txtBtn.textContent = 'Registrar Compra';
+        document.getElementById('btnCancelarEdicionCompraMay')?.classList.add('hidden');
+    }
+}
+
+async function eliminarTransaccionMayorista(id) {
+    const trans = transaccionesMayoristaMemoria.find(t => String(t.id) === String(id));
+    const etiqueta = trans ? `${trans.tipo === 'venta' ? 'la venta' : 'la compra'} ${trans.numero} (${trans.persona})` : 'esta operación';
+    if (!confirm(`¿Estás seguro de que querés eliminar ${etiqueta}? El Stock Mayorista se ajustará automáticamente.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/mayorista/transacciones/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.mensaje || 'Operación eliminada correctamente.', 'info');
+            await Promise.all([
+                cargarMetricasMayorista(),
+                cargarProductosMayorista(),
+                cargarCatalogoOrigenMayorista(),
+                cargarTransaccionesMayorista()
+            ]);
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo eliminar'), 'error');
+        }
+    } catch (err) {
+        showToast('Error de red al eliminar la operación.', 'error');
+    }
+}
+
+// Cargar y mostrar historial de Ventas y Compras con botones de Editar y Eliminar
 async function cargarTransaccionesMayorista() {
     const listVentas = document.getElementById('listaVentasMayorista');
     const listCompras = document.getElementById('listaComprasMayorista');
 
     try {
-        const res = await fetch('/api/mayorista/transacciones?limite=30');
+        const res = await fetch('/api/mayorista/transacciones?limite=50');
         const data = await res.json();
+        transaccionesMayoristaMemoria = Array.isArray(data) ? data : [];
 
-        const ventas = (data || []).filter(t => t.tipo === 'venta');
-        const compras = (data || []).filter(t => t.tipo === 'compra');
+        const ventas = transaccionesMayoristaMemoria.filter(t => t.tipo === 'venta');
+        const compras = transaccionesMayoristaMemoria.filter(t => t.tipo === 'compra');
 
         if (listVentas) {
             if (ventas.length === 0) {
                 listVentas.innerHTML = '<p class="text-xs text-slate-400 italic text-center p-3">No hay ventas registradas aún.</p>';
             } else {
-                listVentas.innerHTML = ventas.map(v => `
-                    <div class="bg-slate-900/80 border border-slate-700/70 p-2.5 rounded-xl flex items-center justify-between text-xs hover:border-rose-500/40 transition">
-                        <div class="space-y-0.5">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-white">${escapeHtml(v.persona || 'Cliente')}</span>
-                                <span class="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">${v.numero}</span>
+                listVentas.innerHTML = ventas.map(v => {
+                    const detalleItemsHtml = (Array.isArray(v.items) && v.items.length > 0)
+                        ? v.items.map(it => `<span class="inline-block bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-300 mr-1 mb-1">📦 ${escapeHtml(it.producto_nombre)} × <b>${it.cantidad}</b> ($${(parseFloat(it.precio_unitario) || 0).toLocaleString('es-AR')})</span>`).join('')
+                        : `<span>📦 ${escapeHtml(v.producto)} • <strong>${v.cantidad} un.</strong></span>`;
+
+                    return `
+                        <div class="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:border-rose-500/40 transition">
+                            <div class="space-y-1 min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-bold text-white">${escapeHtml(v.persona || 'Cliente')}</span>
+                                    <span class="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">${v.numero}</span>
+                                    <span class="text-[10px] text-slate-400">📅 ${formatearFechaVista(v.fecha)}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-400 flex flex-wrap pt-0.5">
+                                    ${detalleItemsHtml}
+                                </div>
                             </div>
-                            <div class="text-[11px] text-slate-400">
-                                📦 ${escapeHtml(v.producto)} • <strong>${v.cantidad} un.</strong> • ${formatearFechaVista(v.fecha)}
+                            <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800 shrink-0">
+                                <div class="text-left sm:text-right">
+                                    <div class="text-xs sm:text-sm font-black text-rose-400">+$${(parseFloat(v.total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                                    <span class="text-[9px] text-slate-500">${v.vendedor || 'sistema'}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="editarTransaccionMayorista(${v.id})" class="bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition" title="Editar venta">
+                                        ✏️
+                                    </button>
+                                    <button type="button" onclick="eliminarTransaccionMayorista(${v.id})" class="bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-rose-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition" title="Eliminar venta">
+                                        🗑️
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <div class="text-xs sm:text-sm font-black text-rose-400">+$${(parseFloat(v.total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
-                            <span class="text-[9px] text-slate-500">${v.vendedor || 'sistema'}</span>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             }
         }
 
@@ -2820,23 +3321,40 @@ async function cargarTransaccionesMayorista() {
             if (compras.length === 0) {
                 listCompras.innerHTML = '<p class="text-xs text-slate-400 italic text-center p-3">No hay compras registradas aún.</p>';
             } else {
-                listCompras.innerHTML = compras.map(c => `
-                    <div class="bg-slate-900/80 border border-slate-700/70 p-2.5 rounded-xl flex items-center justify-between text-xs hover:border-emerald-500/40 transition">
-                        <div class="space-y-0.5">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-white">${escapeHtml(c.persona || 'Proveedor')}</span>
-                                <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">${c.numero}</span>
+                listCompras.innerHTML = compras.map(c => {
+                    const detalleItemsHtml = (Array.isArray(c.items) && c.items.length > 0)
+                        ? c.items.map(it => `<span class="inline-block bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-300 mr-1 mb-1">📥 ${escapeHtml(it.producto_nombre)} × <b>${it.cantidad}</b> ($${(parseFloat(it.precio_unitario) || 0).toLocaleString('es-AR')})</span>`).join('')
+                        : `<span>📥 ${escapeHtml(c.producto)} • <strong>${c.cantidad} un.</strong></span>`;
+
+                    return `
+                        <div class="bg-slate-900/80 border border-slate-700/70 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:border-emerald-500/40 transition">
+                            <div class="space-y-1 min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-bold text-white">${escapeHtml(c.persona || 'Proveedor')}</span>
+                                    <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">${c.numero}</span>
+                                    <span class="text-[10px] text-slate-400">📅 ${formatearFechaVista(c.fecha)}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-400 flex flex-wrap pt-0.5">
+                                    ${detalleItemsHtml}
+                                </div>
                             </div>
-                            <div class="text-[11px] text-slate-400">
-                                📥 ${escapeHtml(c.producto)} • <strong>${c.cantidad} un.</strong> • ${formatearFechaVista(c.fecha)}
+                            <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800 shrink-0">
+                                <div class="text-left sm:text-right">
+                                    <div class="text-xs sm:text-sm font-black text-emerald-400">-$${(parseFloat(c.total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
+                                    <span class="text-[9px] text-slate-500">${c.vendedor || 'sistema'}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="editarTransaccionMayorista(${c.id})" class="bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition" title="Editar compra">
+                                        ✏️
+                                    </button>
+                                    <button type="button" onclick="eliminarTransaccionMayorista(${c.id})" class="bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-rose-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition" title="Eliminar compra">
+                                        🗑️
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <div class="text-xs sm:text-sm font-black text-emerald-400">-$${(parseFloat(c.total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</div>
-                            <span class="text-[9px] text-slate-500">${c.vendedor || 'sistema'}</span>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             }
         }
     } catch (err) {

@@ -497,54 +497,120 @@
                     </div>
                 </div>
 
-                <!-- 2. SECCIÓN VENTAS MAYORISTAS -->
-                <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+                <!-- 2. MÓDULO STOCK MAYORISTA (Arriba de Cargar Venta Mayorista) -->
+                <div class="bg-slate-800/60 border border-pink-500/30 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-700/80 pb-3">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xl p-2 bg-pink-500/10 rounded-xl border border-pink-500/30 text-pink-400">📦</span>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm sm:text-base font-bold text-pink-300 uppercase tracking-wider">Stock Mayorista</h3>
+                                    <span id="badgeCountStockMayorista" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-950 text-pink-300 border border-pink-700/50">0 productos</span>
+                                </div>
+                                <p class="text-[11px] text-slate-400">Inventario exclusivo alimentado por Compras Mayoristas y disponible para Ventas Mayoristas</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex-1 sm:w-56">
+                                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+                                <input type="text" id="buscarStockMayoristaInput" oninput="filtrarVistaStockMayorista(this.value)" placeholder="Filtrar stock mayorista..." class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-pink-500">
+                            </div>
+                            <button type="button" onclick="cargarProductosMayorista()" class="bg-slate-900 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition" title="Actualizar Stock Mayorista">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="contenedorStockMayoristaGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                        <p class="text-xs text-slate-400 italic text-center p-4 col-span-full">Cargando stock mayorista...</p>
+                    </div>
+                </div>
+
+                <!-- 3. SECCIÓN CARGAR VENTA MAYORISTA (Multi-producto, descuenta de Stock Mayorista) -->
+                <div id="cardFormVentaMayorista" class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/80 pb-3">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">🛍️</span>
                             <div>
-                                <h3 class="text-sm sm:text-base font-bold text-rose-400 uppercase tracking-wider">Cargar Venta Mayorista</h3>
-                                <p class="text-[11px] text-slate-400">Registrá la salida y restá unidades del stock mayorista</p>
+                                <h3 id="tituloFormVentaMayorista" class="text-sm sm:text-base font-bold text-rose-400 uppercase tracking-wider">Cargar Venta Mayorista</h3>
+                                <p class="text-[11px] text-slate-400">Elegí uno o más productos del <b class="text-pink-300">Stock Mayorista</b> y descontalos al registrar la venta</p>
                             </div>
                         </div>
-                        <span class="text-[10px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700 self-start sm:self-auto">
-                            Resta del stock mayorista
-                        </span>
+                        <div class="flex items-center gap-2 self-start sm:self-auto">
+                            <button type="button" id="btnCancelarEdicionVentaMay" onclick="cancelarEdicionMayorista('venta')" class="hidden text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1 rounded-lg font-bold transition">
+                                ✕ Cancelar Edición
+                            </button>
+                            <span class="text-[10px] text-rose-300 bg-rose-950/60 px-2.5 py-1 rounded-lg border border-rose-800/60">
+                                Descuenta de Stock Mayorista
+                            </span>
+                        </div>
                     </div>
 
-                    <form id="formVentaMayorista" onsubmit="guardarVentaMayorista(event)" class="space-y-3">
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                            <!-- Cliente -->
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cliente *</label>
-                                <input type="text" id="mayVentaCliente" placeholder="Nombre del cliente mayorista" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
+                    <form id="formVentaMayorista" onsubmit="guardarVentaMayorista(event)" class="space-y-3.5">
+                        <input type="hidden" id="mayVentaEditOrdenId" value="">
+
+                        <!-- Datos del Cliente -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cliente *</label>
+                            <input type="text" id="mayVentaCliente" placeholder="Nombre del cliente mayorista" required class="w-full sm:max-w-md bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
+                        </div>
+
+                        <!-- Selector para agregar productos a la venta -->
+                        <div class="bg-slate-900/60 border border-slate-700/70 p-3 rounded-xl space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-rose-300 uppercase tracking-wider">➕ Agregar Productos del Stock Mayorista</span>
+                                <span class="text-[10px] text-slate-400">Podés agregar varios productos a la misma venta</span>
                             </div>
 
-                            <!-- Producto (Con autocompletado o nuevo) -->
-                            <div class="relative">
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Producto *</label>
-                                <input type="text" id="mayVentaProducto" placeholder="Ej: Pure Seduction Splash" required autocomplete="off" oninput="filtrarProductosMayorista('venta', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
-                                <input type="hidden" id="mayVentaProductoId">
-                                <!-- Sugerencias de productos mayorista -->
-                                <div id="sugerenciasMayVenta" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto"></div>
-                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                                <!-- Producto del Stock Mayorista -->
+                                <div class="relative sm:col-span-5">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Producto (Stock Mayorista)</label>
+                                    <input type="text" id="mayVentaProducto" placeholder="Buscar en Stock Mayorista..." autocomplete="off" onfocus="filtrarProductosMayorista('venta', this.value)" oninput="filtrarProductosMayorista('venta', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                    <input type="hidden" id="mayVentaProductoId">
+                                    <div id="sugerenciasMayVenta" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto"></div>
+                                </div>
 
-                            <!-- Cantidad -->
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cantidad *</label>
-                                <input type="number" id="mayVentaCantidad" min="1" value="1" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
-                            </div>
+                                <!-- Cantidad -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Cantidad</label>
+                                    <input type="number" id="mayVentaCantidad" min="1" value="1" oninput="recalcularSubtotalItemMayorista('venta')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                </div>
 
-                            <!-- Importe -->
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Importe Total ($) *</label>
-                                <input type="number" step="0.01" id="mayVentaImporte" placeholder="0.00" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-rose-500">
+                                <!-- Importe por Unidad -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Importe x Unidad ($)</label>
+                                    <input type="number" step="0.01" id="mayVentaPrecioUnitario" placeholder="0.00" oninput="recalcularSubtotalItemMayorista('venta')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                                </div>
+
+                                <!-- Importe Total del Ítem -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Subtotal ($)</label>
+                                    <input type="number" step="0.01" id="mayVentaImporte" placeholder="0.00" oninput="recalcularUnitarioDesdeTotalMayorista('venta')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-rose-300 font-bold focus:outline-none focus:border-rose-500">
+                                </div>
+
+                                <!-- Botón Agregar a la lista -->
+                                <div class="sm:col-span-1">
+                                    <button type="button" onclick="agregarItemCarritoMayorista('venta')" class="w-full bg-rose-600/90 hover:bg-rose-500 text-white font-bold text-xs py-2 px-2.5 rounded-lg shadow transition flex items-center justify-center gap-1" title="Agregar producto a esta venta">
+                                        ➕ <span class="sm:hidden">Agregar Producto</span>
+                                    </button>
+                                </div>
                             </div>
+                        </div>
+
+                        <!-- Lista de Productos agregados a la Venta actual -->
+                        <div id="contenedorItemsVentaMayorista" class="hidden bg-slate-900/90 border border-rose-500/30 rounded-xl p-3 space-y-2">
+                            <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                                <span class="text-[11px] font-bold text-slate-300 uppercase">Detalle de productos en esta venta</span>
+                                <span id="resumenTotalVentaMayorista" class="text-sm font-black text-rose-400">Total: $0.00</span>
+                            </div>
+                            <div id="listaCarritoVentaMayorista" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
                         </div>
 
                         <div class="flex justify-end pt-1">
                             <button type="submit" id="btnGuardarVentaMay" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 px-6 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
-                                💾 <span>Registrar Venta</span>
+                                💾 <span id="textoBtnGuardarVentaMay">Registrar Venta</span>
                             </button>
                         </div>
                     </form>
@@ -555,60 +621,96 @@
                             <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Últimas Ventas Mayoristas</span>
                             <button type="button" onclick="cargarTransaccionesMayorista()" class="text-[11px] text-rose-400 hover:underline">Actualizar</button>
                         </div>
-                        <div id="listaVentasMayorista" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        <div id="listaVentasMayorista" class="space-y-2 max-h-72 overflow-y-auto pr-1">
                             <p class="text-xs text-slate-400 italic text-center p-3">Cargando ventas...</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- 3. SECCIÓN COMPRAS MAYORISTAS -->
-                <div class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
+                <!-- 4. SECCIÓN CARGAR COMPRA MAYORISTA (Multi-producto, toma catálogo de Incanto y suma a Stock Mayorista) -->
+                <div id="cardFormCompraMayorista" class="bg-slate-800/60 border border-slate-700/60 p-4 sm:p-6 rounded-2xl shadow-xl space-y-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/80 pb-3">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">📥</span>
                             <div>
-                                <h3 class="text-sm sm:text-base font-bold text-emerald-400 uppercase tracking-wider">Cargar Compra Mayorista</h3>
-                                <p class="text-[11px] text-slate-400">Ingresá productos adquiridos a proveedores y sumá al stock</p>
+                                <h3 id="tituloFormCompraMayorista" class="text-sm sm:text-base font-bold text-emerald-400 uppercase tracking-wider">Cargar Compra Mayorista</h3>
+                                <p class="text-[11px] text-slate-400">Elegí productos del catálogo de <b class="text-emerald-300">Incanto</b> (o nuevos) y sumalos a <b class="text-pink-300">Stock Mayorista</b></p>
                             </div>
                         </div>
-                        <span class="text-[10px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700 self-start sm:self-auto">
-                            Suma al stock mayorista
-                        </span>
+                        <div class="flex items-center gap-2 self-start sm:self-auto">
+                            <button type="button" id="btnCancelarEdicionCompraMay" onclick="cancelarEdicionMayorista('compra')" class="hidden text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1 rounded-lg font-bold transition">
+                                ✕ Cancelar Edición
+                            </button>
+                            <span class="text-[10px] text-emerald-300 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-800/60">
+                                Suma al Stock Mayorista
+                            </span>
+                        </div>
                     </div>
 
-                    <form id="formCompraMayorista" onsubmit="guardarCompraMayorista(event)" class="space-y-3">
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                            <!-- Proveedor -->
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Proveedor *</label>
-                                <input type="text" id="mayCompraProveedor" placeholder="Nombre del proveedor" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <form id="formCompraMayorista" onsubmit="guardarCompraMayorista(event)" class="space-y-3.5">
+                        <input type="hidden" id="mayCompraEditOrdenId" value="">
+
+                        <!-- Proveedor -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Proveedor *</label>
+                            <input type="text" id="mayCompraProveedor" placeholder="Nombre del proveedor" required class="w-full sm:max-w-md bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+
+                        <!-- Selector para agregar productos a la compra -->
+                        <div class="bg-slate-900/60 border border-slate-700/70 p-3 rounded-xl space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">➕ Agregar Productos a la Compra</span>
+                                <span class="text-[10px] text-slate-400">Calcula el Importe Total automáticamente (Cantidad × Importe por unidad)</span>
                             </div>
 
-                            <!-- Producto -->
-                            <div class="relative">
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Producto *</label>
-                                <input type="text" id="mayCompraProducto" placeholder="Ej: Pure Seduction Splash" required autocomplete="off" oninput="filtrarProductosMayorista('compra', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
-                                <input type="hidden" id="mayCompraProductoId">
-                                <!-- Sugerencias de productos mayorista -->
-                                <div id="sugerenciasMayCompra" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto"></div>
-                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                                <!-- Producto (Busca en todo el catálogo de Incanto + Mayorista) -->
+                                <div class="relative sm:col-span-5">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Producto (Catálogo Incanto)</label>
+                                    <input type="text" id="mayCompraProducto" placeholder="Buscar producto de Incanto o escribir nuevo..." autocomplete="off" onfocus="filtrarProductosMayorista('compra', this.value)" oninput="filtrarProductosMayorista('compra', this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                    <input type="hidden" id="mayCompraProductoId">
+                                    <div id="sugerenciasMayCompra" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto"></div>
+                                </div>
 
-                            <!-- Cantidad -->
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Cantidad *</label>
-                                <input type="number" id="mayCompraCantidad" min="1" value="1" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
-                            </div>
+                                <!-- Cantidad -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Cantidad</label>
+                                    <input type="number" id="mayCompraCantidad" min="1" value="1" oninput="recalcularSubtotalItemMayorista('compra')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                </div>
 
-                            <!-- Importe -->
-                            <div>
-                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Importe Total ($) *</label>
-                                <input type="number" step="0.01" id="mayCompraImporte" placeholder="0.00" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                <!-- Importe por Unidad -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Importe x Unidad ($)</label>
+                                    <input type="number" step="0.01" id="mayCompraPrecioUnitario" placeholder="0.00" oninput="recalcularSubtotalItemMayorista('compra')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                </div>
+
+                                <!-- Importe Total del Ítem (calculado automáticamente) -->
+                                <div class="sm:col-span-2">
+                                    <label class="block text-[10px] font-semibold text-slate-300 mb-1">Importe Total ($)</label>
+                                    <input type="number" step="0.01" id="mayCompraImporte" placeholder="0.00" oninput="recalcularUnitarioDesdeTotalMayorista('compra')" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-500">
+                                </div>
+
+                                <!-- Botón Agregar a la compra -->
+                                <div class="sm:col-span-1">
+                                    <button type="button" onclick="agregarItemCarritoMayorista('compra')" class="w-full bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs py-2 px-2.5 rounded-lg shadow transition flex items-center justify-center gap-1" title="Agregar producto a esta compra">
+                                        ➕ <span class="sm:hidden">Agregar Producto</span>
+                                    </button>
+                                </div>
                             </div>
+                        </div>
+
+                        <!-- Lista de Productos agregados a la Compra actual -->
+                        <div id="contenedorItemsCompraMayorista" class="hidden bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3 space-y-2">
+                            <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                                <span class="text-[11px] font-bold text-slate-300 uppercase">Detalle de productos en esta compra</span>
+                                <span id="resumenTotalCompraMayorista" class="text-sm font-black text-emerald-400">Total: $0.00</span>
+                            </div>
+                            <div id="listaCarritoCompraMayorista" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
                         </div>
 
                         <div class="flex justify-end pt-1">
                             <button type="submit" id="btnGuardarCompraMay" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 px-6 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5">
-                                📥 <span>Registrar Compra</span>
+                                📥 <span id="textoBtnGuardarCompraMay">Registrar Compra</span>
                             </button>
                         </div>
                     </form>
@@ -619,7 +721,7 @@
                             <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Últimas Compras Mayoristas</span>
                             <button type="button" onclick="cargarTransaccionesMayorista()" class="text-[11px] text-emerald-400 hover:underline">Actualizar</button>
                         </div>
-                        <div id="listaComprasMayorista" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        <div id="listaComprasMayorista" class="space-y-2 max-h-72 overflow-y-auto pr-1">
                             <p class="text-xs text-slate-400 italic text-center p-3">Cargando compras...</p>
                         </div>
                     </div>
