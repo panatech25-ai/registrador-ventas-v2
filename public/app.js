@@ -1416,6 +1416,11 @@ function renderizarCatalogoFiltrado() {
             ? `<span class="bg-sky-950/90 text-sky-400 border border-sky-800/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">🌐 Web</span>`
             : `<span class="bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-md">📁 Sistema</span>`;
 
+        const tieneVariante = p.variante && p.variante.trim() !== '' && p.variante.toLowerCase() !== 'única' && p.variante.toLowerCase() !== 'unica';
+        const badgeVariante = tieneVariante
+            ? `<span class="bg-indigo-950/90 text-indigo-300 border border-indigo-700/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow">🎨 ${escapeHtml(p.variante)}</span>`
+            : '';
+
         const precioFormateado = (p.precio || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         const precioListaFormateado = (p.precio_lista && p.precio_lista > p.precio)
             ? `<span class="text-[10px] text-slate-500 line-through">$${p.precio_lista.toLocaleString('es-AR')} lista</span>`
@@ -1433,8 +1438,9 @@ function renderizarCatalogoFiltrado() {
                          onerror="this.onerror=null; this.src='/img/no-image.svg';" 
                          class="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-300">
                     
-                    <div class="absolute top-2 left-2 flex items-center gap-1">
+                    <div class="absolute top-2 left-2 flex items-center gap-1 flex-wrap max-w-[70%]">
                         ${badgeOrigen}
+                        ${badgeVariante}
                     </div>
 
                     <div class="absolute top-2 right-2">
@@ -1453,7 +1459,7 @@ function renderizarCatalogoFiltrado() {
                     <div>
                         <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
                             <span>${p.codigo_sku || 'S/N'}</span>
-                            <span class="truncate ml-1 max-w-[120px]">${p.variante && p.variante !== 'Única' ? p.variante : ''}</span>
+                            ${tieneVariante ? `<span class="text-indigo-400 font-bold truncate ml-1 max-w-[120px]">🎨 ${escapeHtml(p.variante)}</span>` : ''}
                         </div>
                         <h4 class="text-xs font-bold text-white line-clamp-2 mt-0.5 leading-snug group-hover:text-amber-400 transition" title="${p.nombre}">
                             ${p.nombre}
@@ -1574,6 +1580,18 @@ function abrirModalEditarRapido(prod) {
     document.getElementById('editRapidoPrecio').value = prod.precio || 0;
     document.getElementById('editRapidoStock').value = prod.stock || 0;
 
+    const inputVar = document.getElementById('editRapidoVariante');
+    if (inputVar) inputVar.value = (prod.variante && prod.variante !== 'Única') ? prod.variante : '';
+
+    const inputImg = document.getElementById('editRapidoImagenUrl');
+    if (inputImg) {
+        inputImg.value = prod.imagen_url && prod.imagen_url !== '/img/no-image.svg' ? prod.imagen_url : '';
+        inputImg.oninput = () => {
+            const previewImg = document.getElementById('editRapidoImg');
+            if (previewImg) previewImg.src = inputImg.value.trim() || '/img/no-image.svg';
+        };
+    }
+
     document.getElementById('editRapidoSku').textContent = prod.codigo_sku || 'S/N';
     document.getElementById('editRapidoTituloPreview').textContent = prod.nombre || '';
 
@@ -1601,6 +1619,8 @@ async function guardarEdicionRapidaProducto(e) {
     const nombre = document.getElementById('editRapidoNombre').value;
     const precio = document.getElementById('editRapidoPrecio').value;
     const stock = document.getElementById('editRapidoStock').value;
+    const variante = document.getElementById('editRapidoVariante') ? document.getElementById('editRapidoVariante').value.trim() : '';
+    const imagen_url = document.getElementById('editRapidoImagenUrl') ? document.getElementById('editRapidoImagenUrl').value.trim() : '';
 
     if (!nombre || nombre.trim() === '') {
         showToast('El nombre del producto no puede estar vacío.', 'warning');
@@ -1611,13 +1631,19 @@ async function guardarEdicionRapidaProducto(e) {
         const res = await fetch(`/api/productos/${id}/stock`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nombre, precio, stock })
+            body: JSON.stringify({
+                nombre,
+                precio,
+                stock,
+                variante: variante || 'Única',
+                imagen_url: imagen_url || '/img/no-image.svg'
+            })
         });
         const data = await res.json();
 
         if (data.success) {
-            showToast('Producto y stock actualizados correctamente.', 'success');
-            
+            showToast('Producto, variante y stock actualizados correctamente.', 'success');
+
             // Actualizar localmente en memoria
             const idx = CATALOGO_PRODUCTOS.findIndex(p => String(p.id) === String(id));
             if (idx !== -1) {
@@ -1625,6 +1651,8 @@ async function guardarEdicionRapidaProducto(e) {
                 CATALOGO_PRODUCTOS[idx].precio = parseFloat(precio);
                 CATALOGO_PRODUCTOS[idx].precio_efectivo = parseFloat(precio);
                 CATALOGO_PRODUCTOS[idx].stock = parseInt(stock, 10);
+                CATALOGO_PRODUCTOS[idx].variante = variante || 'Única';
+                CATALOGO_PRODUCTOS[idx].imagen_url = imagen_url || '/img/no-image.svg';
                 actualizarContadoresStockPills(CATALOGO_PRODUCTOS);
                 renderizarCatalogoFiltrado();
             }

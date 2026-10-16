@@ -168,11 +168,14 @@ function parseProductsFromHtml(html) {
                 stock = 0;
             }
 
+            const hasSecondary = blockHtml.includes('js-product-item-private-with-secondary-images');
+
             products.push({
                 productId,
                 name,
                 image,
                 url,
+                hasSecondary,
                 precioLista: regularPrice,
                 precioEfectivo,
                 stock
@@ -261,7 +264,77 @@ async function scrapeTiendaProductos(marca = 'panatech') {
         currentStartPage += batchPages;
     }
 
-    return allProducts;
+    // 3. Para productos con imágenes secundarias o posibles variantes, verificar variantes desde la ficha de producto
+    const prodsWithVariantsToCheck = allProducts.filter(p => p.hasSecondary && p.url);
+    if (prodsWithVariantsToCheck.length > 0) {
+        console.log(`[Scraper ${brandKey.toUpperCase()}] Verificando variantes para ${prodsWithVariantsToCheck.length} productos con múltiples opciones...`);
+        const batchSizeVariants = 6;
+        for (let i = 0; i < prodsWithVariantsToCheck.length; i += batchSizeVariants) {
+            const batch = prodsWithVariantsToCheck.slice(i, i + batchSizeVariants);
+            await Promise.all(batch.map(async (p) => {
+                try {
+                    const prodHtml = await fetchPage(p.url, 8000);
+                    const varMatch = prodHtml.match(/LS\.variants\s*=\s*(\[[\s\S]*?\]);/);
+                    if (varMatch) {
+                        const parsed = JSON.parse(varMatch[1]);
+                        if (Array.isArray(parsed) && parsed.length > 1 && parsed.some(v => v.option0)) {
+                            p.variants = parsed;
+                        }
+                    }
+                } catch (err) {
+                    // Mantener producto simple si falla la petición individual
+                }
+            }));
+        }
+    }
+
+    // 4. Expandir productos con variantes para que cada variante sea un producto completo con su imagen correspondiente
+    const expandedProducts = [];
+    for (const p of allProducts) {
+        if (p.variants && p.variants.length > 1) {
+            for (const v of p.variants) {
+                if (!v.option0) continue;
+                const varName = String(v.option0).trim();
+                let varImg = v.image_url ? (v.image_url.startsWith('//') ? 'https:' + v.image_url : v.image_url) : p.image;
+
+                let varStock = 0;
+                if (v.stock !== null && v.stock !== undefined) {
+                    varStock = parseInt(v.stock, 10) || 0;
+                } else if (v.available) {
+                    varStock = 1;
+                }
+
+                let varPrecioLista = v.price_number || p.precioLista;
+                let varPrecioEfectivo = p.precioEfectivo;
+                if (v.price_with_payment_discount_short) {
+                    const clean = String(v.price_with_payment_discount_short).replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
+                    const parsed = parseFloat(clean);
+                    if (!isNaN(parsed) && parsed > 0) varPrecioEfectivo = parsed;
+                }
+
+                expandedProducts.push({
+                    productId: p.productId,
+                    variantId: v.id,
+                    name: p.name,
+                    variantName: varName,
+                    image: varImg,
+                    url: p.url,
+                    precioLista: varPrecioLista,
+                    precioEfectivo: varPrecioEfectivo,
+                    stock: varStock,
+                    esVariante: true
+                });
+            }
+        } else {
+            expandedProducts.push({
+                ...p,
+                variantName: 'Única',
+                esVariante: false
+            });
+        }
+    }
+
+    return expandedProducts;
 }
 
 // Helper para obtener todos los productos de una marca en Supabase superando el límite de 1000 filas
@@ -452,54 +525,97 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
     const toUpdate = [];
     const idsToDelete = [];
     const idsToZeroStock = [];
+    const matchedDbIds = new Set();
 
     // 4. Iterar sobre los productos scrapeados y unificar
     for (const sp of scraped) {
         const sNorm = normalizeName(sp.name);
+        const varNorm = normalizeName(sp.variantName || '');
 
-        // Buscar coincidencias en la DB
-        let listaCoincidentes = productosPorNombre.get(sNorm);
-        if (!listaCoincidentes || listaCoincidentes.length === 0) {
-            // Match parcial si longitud > 10
-            for (const [nKey, list] of productosPorNombre.entries()) {
-                if (nKey.length > 10 && sNorm.length > 10 && (nKey.includes(sNorm) || sNorm.includes(nKey))) {
-                    listaCoincidentes = list;
-                    break;
+        let principal = null;
+
+        // A. Coincidencia exacta por metadata (productId + variantId)
+        if (sp.variantId) {
+            principal = (dbProds || []).find(p => !matchedDbIds.has(p.id) && metadata[p.id]?.productId === sp.productId && String(metadata[p.id]?.variantId) === String(sp.variantId));
+        }
+
+        // B. Coincidencia por metadata (productId + nombre con variante o variante coincidente)
+        if (!principal && sp.esVariante && varNorm) {
+            principal = (dbProds || []).find(p => {
+                if (matchedDbIds.has(p.id)) return false;
+                if (metadata[p.id]?.productId !== sp.productId) return false;
+                const pVarNorm = normalizeName(p.variante || '');
+                const pNomNorm = normalizeName(p.nombre || '');
+                return pVarNorm === varNorm || pNomNorm.includes(varNorm);
+            });
+        }
+
+        // C. Coincidencia por nombre normalizado Y variante coincidente (o nombre con color)
+        if (!principal && sp.esVariante && varNorm) {
+            principal = (dbProds || []).find(p => {
+                if (matchedDbIds.has(p.id)) return false;
+                const pNomNorm = normalizeName(p.nombre || '');
+                const pVarNorm = normalizeName(p.variante || '');
+                const nombreCoincide = pNomNorm === sNorm || (pNomNorm.length > 10 && (pNomNorm.includes(sNorm) || sNorm.includes(pNomNorm)));
+                if (!nombreCoincide) return false;
+                return pVarNorm === varNorm || pNomNorm.includes(varNorm);
+            });
+        }
+
+        // D. Coincidencia por nombre para producto base (o variante inicial)
+        if (!principal) {
+            const candidatos = (dbProds || []).filter(p => {
+                if (matchedDbIds.has(p.id)) return false;
+                const pNomNorm = normalizeName(p.nombre || '');
+                const pVarNorm = normalizeName(p.variante || '');
+
+                if (sp.esVariante && varNorm && pVarNorm && pVarNorm !== 'unica' && pVarNorm !== varNorm) {
+                    return false;
                 }
+
+                if (sp.esVariante && varNorm && ['negro', 'blanco', 'rosa', 'azul', 'rojo', 'verde', 'gris', 'amarillo'].some(c => c !== varNorm && pNomNorm.includes(c))) {
+                    return false;
+                }
+
+                return pNomNorm === sNorm || (pNomNorm.length > 10 && (pNomNorm.includes(sNorm) || sNorm.includes(pNomNorm)));
+            });
+
+            if (candidatos.length > 0) {
+                candidatos.sort((a, b) => {
+                    const aVentas = idsConVentas.has(a.id) ? 1 : 0;
+                    const bVentas = idsConVentas.has(b.id) ? 1 : 0;
+                    if (aVentas !== bVentas) return bVentas - aVentas;
+                    return a.id - b.id;
+                });
+                principal = candidatos[0];
             }
         }
 
-        if (listaCoincidentes && listaCoincidentes.length > 0) {
-            // El producto ya existe en la DB. Unificamos si hay duplicados:
-            // Elegir producto principal: preferir el que tiene ventas en orden_detalles, o el menor ID
-            listaCoincidentes.sort((a, b) => {
-                const aVentas = idsConVentas.has(a.id) ? 1 : 0;
-                const bVentas = idsConVentas.has(b.id) ? 1 : 0;
-                if (aVentas !== bVentas) return bVentas - aVentas;
-                return a.id - b.id;
-            });
+        if (principal) {
+            matchedDbIds.add(principal.id);
 
-            const principal = listaCoincidentes[0];
-            const duplicadosSecundarios = listaCoincidentes.slice(1);
-
-            // Actualizar producto principal con precio efectivo y stock de la web si difiere
             const precioDifiere = Math.abs((parseFloat(principal.precio) || 0) - sp.precioEfectivo) > 0.01;
             const stockDifiere = (parseInt(principal.stock, 10) || 0) !== sp.stock;
+            const varianteDifiere = sp.variantName && sp.variantName !== 'Única' && principal.variante !== sp.variantName;
 
-            if (precioDifiere || stockDifiere) {
+            const nuevaVariante = (sp.variantName && sp.variantName !== 'Única') ? sp.variantName : (principal.variante || 'Única');
+
+            if (precioDifiere || stockDifiere || varianteDifiere) {
                 toUpdate.push({
                     id: principal.id,
                     precio: sp.precioEfectivo,
-                    stock: sp.stock
+                    stock: sp.stock,
+                    variante: nuevaVariante
                 });
                 actualizados++;
             } else {
                 sinCambios++;
             }
 
-            // Guardar metadata del producto principal
             metadata[principal.id] = {
                 productId: sp.productId,
+                variantId: sp.variantId || null,
+                variante: nuevaVariante,
                 imagen_url: sp.image || '/img/no-image.svg',
                 url_tienda: sp.url,
                 precio_lista: sp.precioLista,
@@ -508,11 +624,21 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
                 ultima_sync: new Date().toISOString()
             };
 
-            // Tratar duplicados secundarios
+            // Buscar duplicados redundantes de ESTA misma variante (mismo nombre Y misma variante)
+            const duplicadosSecundarios = (dbProds || []).filter(dup => {
+                if (dup.id === principal.id || matchedDbIds.has(dup.id)) return false;
+                const dNom = normalizeName(dup.nombre || '');
+                const dVar = normalizeName(dup.variante || '');
+                return dNom === sNorm && dVar === normalizeName(nuevaVariante);
+            });
+
             for (const dup of duplicadosSecundarios) {
+                matchedDbIds.add(dup.id);
                 duplicadosUnificados++;
                 metadata[dup.id] = {
                     productId: sp.productId,
+                    variantId: sp.variantId || null,
+                    variante: nuevaVariante,
                     imagen_url: sp.image || '/img/no-image.svg',
                     url_tienda: sp.url,
                     precio_lista: sp.precioLista,
@@ -529,15 +655,16 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
                 }
             }
         } else {
-            // Producto NUEVO en el sistema: preparar para insertar
-            const nuevoSku = `${config.skuPrefix}${sp.productId.slice(-6)}`;
+            // Producto o variante NUEVA en el sistema: preparar para insertar
+            const varSuffix = sp.variantId ? `-${String(sp.variantId).slice(-4)}` : (sp.variantName && sp.variantName !== 'Única' ? `-${normalizeName(sp.variantName).slice(0, 3)}` : '');
+            const nuevoSku = `${config.skuPrefix}${sp.productId.slice(-6)}${varSuffix}`;
             toInsert.push({
                 sp,
                 sNorm,
                 row: {
                     codigo_sku: nuevoSku,
                     nombre: sp.name,
-                    variante: 'Única',
+                    variante: sp.variantName || 'Única',
                     precio: sp.precioEfectivo,
                     stock: sp.stock,
                     marca: brandKey
@@ -554,7 +681,7 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
             await Promise.all(group.map(u =>
                 supabase
                     .from('productos')
-                    .update({ precio: u.precio, stock: u.stock })
+                    .update({ precio: u.precio, stock: u.stock, variante: u.variante })
                     .eq('id', u.id)
             ));
         }
@@ -574,11 +701,13 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
             if (!insertErr && insertedRows) {
                 for (let j = 0; j < insertedRows.length; j++) {
                     const ins = insertedRows[j];
-                    const origin = batch[j] ? batch[j].sp : batch.find(b => b.row.nombre === ins.nombre)?.sp;
+                    const origin = batch[j] ? batch[j].sp : batch.find(b => b.row.nombre === ins.nombre && b.row.variante === ins.variante)?.sp;
                     if (origin) {
                         nuevos++;
                         metadata[ins.id] = {
                             productId: origin.productId,
+                            variantId: origin.variantId || null,
+                            variante: origin.variantName || ins.variante || 'Única',
                             imagen_url: origin.image || '/img/no-image.svg',
                             url_tienda: origin.url,
                             precio_lista: origin.precioLista,

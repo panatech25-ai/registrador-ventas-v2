@@ -378,18 +378,22 @@ app.get('/api/productos/catalogo', async (req, res) => {
             };
         });
 
-        // Unificar productos por nombre para evitar duplicados en la vista
+        // Unificar productos por nombre y variante para evitar duplicados en la vista sin colapsar variantes legítimas
         const unificadosMap = new Map();
         for (const p of productosEnriquecidos) {
             const norm = (p.nombre || '').toLowerCase().trim();
-            if (!unificadosMap.has(norm)) {
-                unificadosMap.set(norm, p);
+            const varNorm = (p.variante && p.variante.toLowerCase() !== 'única' && p.variante.toLowerCase() !== 'unica')
+                ? p.variante.toLowerCase().trim()
+                : '';
+            const key = varNorm ? `${norm}___${varNorm}` : norm;
+            if (!unificadosMap.has(key)) {
+                unificadosMap.set(key, p);
             } else {
-                const existente = unificadosMap.get(norm);
+                const existente = unificadosMap.get(key);
                 // Preferir el que está sincronizado con web y tiene foto, o el que tiene mayor stock
                 const nuevoMejor = (p.synced_web && !existente.synced_web) || (p.stock > existente.stock && p.synced_web === existente.synced_web);
                 if (nuevoMejor) {
-                    unificadosMap.set(norm, p);
+                    unificadosMap.set(key, p);
                 }
             }
         }
@@ -501,23 +505,40 @@ app.get('/api/productos/buscar', async (req, res) => {
     }
 });
 
-// API Modificar Nombre, Precio y Stock
+// API Modificar Nombre, Precio, Stock, Variante e Imagen
 app.put('/api/productos/:id/stock', async (req, res) => {
     const { id } = req.params;
-    const { nombre, precio, stock } = req.body;
+    const { nombre, precio, stock, variante, imagen_url } = req.body;
 
     try {
         const updateData = {};
         if (nombre !== undefined && nombre.trim() !== '') updateData.nombre = nombre.trim();
         if (precio !== undefined) updateData.precio = parseFloat(precio);
         if (stock !== undefined) updateData.stock = parseInt(stock);
+        if (variante !== undefined) updateData.variante = variante.trim() || 'Única';
 
-        const { data, error } = await supabase
-            .from('productos')
-            .update(updateData)
-            .eq('id', id);
+        if (Object.keys(updateData).length > 0) {
+            const { data, error } = await supabase
+                .from('productos')
+                .update(updateData)
+                .eq('id', id);
 
-        if (error) throw error;
+            if (error) throw error;
+        }
+
+        // Si se actualizó imagen_url, persistir en metadata de la marca del producto
+        if (imagen_url !== undefined) {
+            const { data: prod } = await supabase.from('productos').select('marca').eq('id', id).single();
+            if (prod && prod.marca) {
+                const metadata = await obtenerMetadataMarca(supabase, prod.marca);
+                if (!metadata[id]) metadata[id] = {};
+                metadata[id].imagen_url = imagen_url.trim() || '/img/no-image.svg';
+                if (variante !== undefined) metadata[id].variante = variante.trim() || 'Única';
+                metadata[id].ultima_modificacion = new Date().toISOString();
+                await guardarMetadataMarca(supabase, metadata, prod.marca);
+            }
+        }
+
         res.json({ success: true, mensaje: 'Producto actualizado correctamente.' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
