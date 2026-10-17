@@ -393,6 +393,7 @@ function enviarWhatsappCadete() {
 // ==========================================
 // BÚSQUEDA DE PRODUCTOS CON DEBOUNCE Y STOCK
 // ==========================================
+let PRODUCTOS_BUSQUEDA_ACTUAL = [];
 const onProdSearchInput = debounce((val) => buscarProductos(val), 250);
 
 async function buscarProductos(query) {
@@ -405,11 +406,12 @@ async function buscarProductos(query) {
     try {
         const res = await fetch(`/api/productos/buscar?q=${encodeURIComponent(query)}&marca=${MARCA_ACTUAL}`);
         const productos = await res.json();
+        PRODUCTOS_BUSQUEDA_ACTUAL = Array.isArray(productos) ? productos : [];
 
-        if (!productos || productos.length === 0) {
+        if (!PRODUCTOS_BUSQUEDA_ACTUAL || PRODUCTOS_BUSQUEDA_ACTUAL.length === 0) {
             resDiv.innerHTML = '<div class="p-3 text-xs text-slate-400 italic text-center">No se encontraron productos</div>';
         } else {
-            resDiv.innerHTML = productos.map(p => {
+            resDiv.innerHTML = PRODUCTOS_BUSQUEDA_ACTUAL.map((p, idx) => {
                 const stockNum = parseInt(p.stock) || 0;
                 let stockBadge = `<span class="text-[10px] text-slate-400">Stock: ${stockNum}</span>`;
                 if (stockNum <= 0) {
@@ -418,17 +420,32 @@ async function buscarProductos(query) {
                     stockBadge = `<span class="text-[9px] bg-amber-950/80 text-amber-300 border border-amber-800 px-1.5 py-0.5 rounded font-bold">⚠️ Poco stock: ${stockNum}</span>`;
                 }
 
+                const tieneImg = p.imagen_url && p.imagen_url !== '/img/no-image.svg' && !p.imagen_url.includes('no-image');
+                const imgHtml = tieneImg
+                    ? `<img src="${p.imagen_url}" alt="${escapeHtml(p.nombre)}" loading="lazy" onerror="this.onerror=null;this.src='/img/no-image.svg';" class="w-10 h-10 rounded-lg object-contain bg-slate-950 border border-slate-700 shrink-0 p-0.5 shadow">`
+                    : `<div class="w-10 h-10 rounded-lg bg-slate-900 border border-slate-700/80 flex items-center justify-center text-slate-500 text-xs shrink-0 shadow">📷</div>`;
+
+                const tieneVar = p.variante && p.variante.trim() !== '' && p.variante.toLowerCase() !== 'única' && p.variante.toLowerCase() !== 'unica';
+                const varBadge = tieneVar
+                    ? `<span class="bg-indigo-950/90 text-indigo-300 border border-indigo-700/80 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm">🎨 ${escapeHtml(p.variante)}</span>`
+                    : `<span class="text-[10px] text-slate-400">Var: ${escapeHtml(p.variante || 'N/A')}</span>`;
+
                 return `
-                <div onclick="seleccionarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="p-2.5 hover:bg-slate-700/80 cursor-pointer border-b border-slate-700/50 flex justify-between items-center transition">
-                    <div>
-                        <div class="text-xs font-bold text-white">${p.nombre}</div>
-                        <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                            <span>Var: ${p.variante || 'N/A'}</span>
-                            <span>•</span>
-                            ${stockBadge}
+                <div onclick="seleccionarProductoPorIndex(${idx})" class="p-2.5 hover:bg-slate-700/80 cursor-pointer border-b border-slate-700/50 last:border-b-0 flex items-center justify-between gap-3 transition">
+                    <div class="flex items-center gap-3 min-w-0">
+                        ${imgHtml}
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-white truncate" title="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</div>
+                            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                                ${varBadge}
+                                ${p.codigo_sku ? `<span class="text-[10px] text-slate-400 font-mono">${escapeHtml(p.codigo_sku)}</span><span class="text-slate-500 text-[10px]">•</span>` : ''}
+                                ${stockBadge}
+                            </div>
                         </div>
                     </div>
-                    <div class="text-xs font-bold text-emerald-400">$${parseFloat(p.precio).toFixed(2)}</div>
+                    <div class="text-right shrink-0">
+                        <div class="text-xs font-extrabold text-emerald-400">$${parseFloat(p.precio).toFixed(2)}</div>
+                    </div>
                 </div>
             `;
             }).join('');
@@ -437,6 +454,11 @@ async function buscarProductos(query) {
     } catch (err) {
         console.error(err);
     }
+}
+
+function seleccionarProductoPorIndex(idx) {
+    const p = PRODUCTOS_BUSQUEDA_ACTUAL[idx];
+    if (p) seleccionarProducto(p);
 }
 
 function seleccionarProducto(p) {
@@ -449,10 +471,13 @@ function seleccionarProducto(p) {
             id: p.id,
             nombre: p.nombre,
             variante: p.variante,
+            codigo_sku: p.codigo_sku || '',
+            imagen_url: p.imagen_url || '/img/no-image.svg',
             precio: parseFloat(p.precio),
             cantidad: 1
         });
-        showToast(`Agregado: ${p.nombre}`, 'success');
+        const detalleVar = (p.variante && p.variante !== 'Única') ? ` (${p.variante})` : '';
+        showToast(`Agregado: ${p.nombre}${detalleVar}`, 'success');
     }
     document.getElementById('prodSearch').value = '';
     document.getElementById('prodResults').classList.add('hidden');
@@ -467,19 +492,38 @@ function renderCarrito() {
         return;
     }
 
-    container.innerHTML = carrito.map((item, index) => `
-        <div class="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-xl border border-slate-700/80 text-xs">
-            <div class="flex-1 pr-2">
-                <div class="font-bold text-white">${item.nombre}</div>
-                <div class="text-[10px] text-slate-400">${item.variante || ''}</div>
+    container.innerHTML = carrito.map((item, index) => {
+        const tieneImg = item.imagen_url && item.imagen_url !== '/img/no-image.svg' && !item.imagen_url.includes('no-image');
+        const imgHtml = tieneImg
+            ? `<img src="${item.imagen_url}" alt="${escapeHtml(item.nombre)}" loading="lazy" onerror="this.onerror=null;this.src='/img/no-image.svg';" class="w-11 h-11 rounded-lg object-contain bg-slate-950 border border-slate-700/80 shrink-0 p-0.5 shadow">`
+            : `<div class="w-11 h-11 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-600 text-xs shrink-0 shadow">📷</div>`;
+
+        const tieneVar = item.variante && item.variante.trim() !== '' && item.variante.toLowerCase() !== 'única' && item.variante.toLowerCase() !== 'unica';
+        const varBadge = tieneVar
+            ? `<span class="bg-indigo-950/80 text-indigo-300 border border-indigo-700/60 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm">🎨 ${escapeHtml(item.variante)}</span>`
+            : (item.variante ? `<span class="text-[10px] text-slate-400">Var: ${escapeHtml(item.variante)}</span>` : '');
+
+        return `
+        <div class="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-xl border border-slate-700/80 text-xs gap-3 transition hover:border-slate-600 shadow-sm">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+                ${imgHtml}
+                <div class="min-w-0 flex-1">
+                    <div class="font-bold text-white truncate" title="${escapeHtml(item.nombre)}">${escapeHtml(item.nombre)}</div>
+                    <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                        ${varBadge}
+                        ${item.codigo_sku ? `<span class="text-[10px] text-slate-400 font-mono">${escapeHtml(item.codigo_sku)}</span>` : ''}
+                        <span class="text-[10px] text-slate-400 font-medium">($${parseFloat(item.precio).toFixed(2)} c/u)</span>
+                    </div>
+                </div>
             </div>
-            <div class="flex items-center gap-2">
-                <input type="number" min="1" value="${item.cantidad}" onchange="cambiarCantidad(${index}, this.value)" class="w-12 bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-center font-bold text-white">
-                <div class="font-bold text-emerald-400 w-16 text-right">$${(item.precio * item.cantidad).toFixed(2)}</div>
-                <button type="button" onclick="eliminarDelCarrito(${index})" class="text-rose-400 hover:text-rose-300 font-bold px-1.5" title="Quitar">✕</button>
+            <div class="flex items-center gap-2 shrink-0">
+                <input type="number" min="1" value="${item.cantidad}" onchange="cambiarCantidad(${index}, this.value)" class="w-12 bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-center font-bold text-white focus:outline-none focus:border-amber-500">
+                <div class="font-extrabold text-emerald-400 w-20 text-right">$${(item.precio * item.cantidad).toFixed(2)}</div>
+                <button type="button" onclick="eliminarDelCarrito(${index})" class="text-rose-400 hover:text-rose-300 font-bold p-1 hover:bg-rose-950/40 rounded transition" title="Quitar">✕</button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     calcularTotal();
 }
@@ -636,13 +680,18 @@ async function buscarOrden() {
         if (chkProd) chkProd.checked = (data.pago_envio === 'PRODUCTO_ABONADO');
         if (chkTotal) chkTotal.checked = (data.pago_envio === 'ABONADO_TOTAL');
 
-        carrito = (data.orden_detalles || []).map(d => ({
-            id: d.producto_id,
-            nombre: (d.productos && d.productos.nombre) ? d.productos.nombre : 'Producto',
-            variante: d.productos ? d.productos.variante : '',
-            precio: parseFloat(d.precio_unitario),
-            cantidad: d.cantidad
-        }));
+        carrito = (data.orden_detalles || []).map(d => {
+            const prodLocal = (typeof CATALOGO_PRODUCTOS !== 'undefined' && Array.isArray(CATALOGO_PRODUCTOS)) ? CATALOGO_PRODUCTOS.find(p => p.id === d.producto_id) : null;
+            return {
+                id: d.producto_id,
+                nombre: (d.productos && d.productos.nombre) ? d.productos.nombre : 'Producto',
+                variante: d.productos ? d.productos.variante : '',
+                codigo_sku: d.productos ? (d.productos.codigo_sku || '') : (prodLocal?.codigo_sku || ''),
+                imagen_url: (d.productos && d.productos.imagen_url) || prodLocal?.imagen_url || '/img/no-image.svg',
+                precio: parseFloat(d.precio_unitario),
+                cantidad: d.cantidad
+            };
+        });
 
         renderCarrito();
         showToast(`Orden ${data.numero_orden} cargada en formulario.`, 'info');
@@ -1067,13 +1116,18 @@ async function buscarOrdenDirecto(num) {
         if (chkProd) chkProd.checked = (data.pago_envio === 'PRODUCTO_ABONADO');
         if (chkTotal) chkTotal.checked = (data.pago_envio === 'ABONADO_TOTAL');
 
-        carrito = (data.orden_detalles || []).map(d => ({
-            id: d.producto_id,
-            nombre: (d.productos && d.productos.nombre) ? d.productos.nombre : 'Producto',
-            variante: d.productos ? d.productos.variante : '',
-            precio: parseFloat(d.precio_unitario),
-            cantidad: d.cantidad
-        }));
+        carrito = (data.orden_detalles || []).map(d => {
+            const prodLocal = (typeof CATALOGO_PRODUCTOS !== 'undefined' && Array.isArray(CATALOGO_PRODUCTOS)) ? CATALOGO_PRODUCTOS.find(p => p.id === d.producto_id) : null;
+            return {
+                id: d.producto_id,
+                nombre: (d.productos && d.productos.nombre) ? d.productos.nombre : 'Producto',
+                variante: d.productos ? d.productos.variante : '',
+                codigo_sku: d.productos ? (d.productos.codigo_sku || '') : (prodLocal?.codigo_sku || ''),
+                imagen_url: (d.productos && d.productos.imagen_url) || prodLocal?.imagen_url || '/img/no-image.svg',
+                precio: parseFloat(d.precio_unitario),
+                cantidad: d.cantidad
+            };
+        });
 
         renderCarrito();
         showToast(`Orden ${data.numero_orden} cargada en formulario.`, 'info');
@@ -2876,8 +2930,13 @@ function seleccionarProductoMayorista(tipo, id, nombre, precio, stock) {
     document.getElementById(contenedorId)?.classList.add('hidden');
 }
 
-// Cerrar desplegables de sugerencias mayoristas al hacer clic fuera
+// Cerrar desplegables de sugerencias y búsqueda al hacer clic fuera
 document.addEventListener('click', (e) => {
+    const prodRes = document.getElementById('prodResults');
+    const prodInp = document.getElementById('prodSearch');
+    if (prodRes && !prodRes.contains(e.target) && e.target !== prodInp) {
+        prodRes.classList.add('hidden');
+    }
     const sugVenta = document.getElementById('sugerenciasMayVenta');
     const inpVenta = document.getElementById('mayVentaProducto');
     if (sugVenta && !sugVenta.contains(e.target) && e.target !== inpVenta) {

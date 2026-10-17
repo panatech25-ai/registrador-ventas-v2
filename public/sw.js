@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwa-registrador-v18';
+const CACHE_NAME = 'pwa-registrador-v19';
 
 self.addEventListener('install', (event) => {
     self.skipWaiting();

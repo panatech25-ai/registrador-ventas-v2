@@ -703,7 +703,7 @@ function procesarObservacionesParaGuardar(observaciones = '', pago_envio = null)
     return texto;
 }
 
-function procesarOrdenParaRespuesta(orden) {
+function procesarOrdenParaRespuesta(orden, metadata = null) {
     if (!orden) return orden;
     let pago_envio = null;
     let obs = orden.observaciones || '';
@@ -717,6 +717,15 @@ function procesarOrdenParaRespuesta(orden) {
     }
     orden.pago_envio = pago_envio;
     orden.observaciones = obs;
+
+    if (metadata && Array.isArray(orden.orden_detalles)) {
+        for (const det of orden.orden_detalles) {
+            if (det.productos) {
+                det.productos.imagen_url = metadata[det.producto_id]?.imagen_url || '/img/no-image.svg';
+            }
+        }
+    }
+
     return orden;
 }
 
@@ -736,7 +745,8 @@ app.get('/api/ordenes/ultimas', async (req, res) => {
             .limit(limitNum);
 
         if (error) throw error;
-        res.json((data || []).map(procesarOrdenParaRespuesta));
+        const metadata = await obtenerMetadataMarca(supabase, marcaTarget);
+        res.json((data || []).map(o => procesarOrdenParaRespuesta(o, metadata)));
     } catch (err) {
         res.json([]);
     }
@@ -812,7 +822,8 @@ app.get('/api/ordenes/buscar/:num', async (req, res) => {
         .single();
 
     if (error || !orden) return res.status(404).json({ error: 'Orden no encontrada.' });
-    res.json(procesarOrdenParaRespuesta(orden));
+    const metadata = await obtenerMetadataMarca(supabase, marcaTarget);
+    res.json(procesarOrdenParaRespuesta(orden, metadata));
 });
 
 // API Búsqueda Avanzada de Órdenes (Filtros múltiples: texto, estado, vendedor, fecha, modo)
