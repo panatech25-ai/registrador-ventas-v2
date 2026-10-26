@@ -218,6 +218,10 @@ function aplicarPermisosEnUI() {
             cambiarSeccion('mayorista');
         } else if (puedeBusqueda) {
             cambiarSeccion('busqueda');
+        } else if (puedeStock) {
+            cambiarSeccion('stock');
+        } else if (puedeInformes) {
+            cambiarSeccion('informes');
         }
     }
 }
@@ -755,133 +759,119 @@ let SECCION_ACTUAL = 'nueva';
 function cambiarSeccion(seccion) {
     const esIncanto = MARCA_ACTUAL === 'incanto';
     const puedeMayorista = esIncanto && (ES_ADMIN || !!PERMISOS_ACTUALES.mayorista);
+    const puedeStock = ES_ADMIN || !!PERMISOS_ACTUALES.stock;
+    const puedeInformes = ES_ADMIN || !!PERMISOS_ACTUALES.informes;
+    const puedeNueva = ES_ADMIN || !!PERMISOS_ACTUALES.nueva_orden;
+    const puedeBusqueda = ES_ADMIN || !!PERMISOS_ACTUALES.busqueda;
+    const puedeUsuarios = ES_ADMIN || (USUARIO_ACTUAL || '').toLowerCase().trim() === 'npanadisi';
 
-    // Si intentan navegar a mayorista sin ser Incanto o sin permisos, redirigir a 'nueva'
-    if (seccion === 'mayorista' && !puedeMayorista) {
-        seccion = 'nueva';
+    // Validar permisos de la sección solicitada
+    if (seccion === 'mayorista' && !puedeMayorista) seccion = 'nueva';
+    if (seccion === 'usuarios' && !puedeUsuarios) seccion = 'nueva';
+    if (seccion === 'informes' && !puedeInformes) seccion = 'nueva';
+    if (seccion === 'stock' && !puedeStock) seccion = 'nueva';
+    if (seccion === 'busqueda' && !puedeBusqueda) seccion = 'nueva';
+    if (seccion === 'nueva' && !puedeNueva) {
+        if (puedeMayorista) seccion = 'mayorista';
+        else if (puedeBusqueda) seccion = 'busqueda';
+        else if (puedeStock) seccion = 'stock';
+        else if (puedeInformes) seccion = 'informes';
     }
 
     SECCION_ACTUAL = seccion;
-    const secNueva = document.getElementById('seccionNuevaOrden');
-    const secBusqueda = document.getElementById('seccionBusquedaOrdenes');
-    const secMayorista = document.getElementById('seccionMayorista');
 
-    const sideNueva = document.getElementById('sideNavNueva');
-    const sideBusqueda = document.getElementById('sideNavBusqueda');
-    const sideMayorista = document.getElementById('sideNavMayorista');
+    // Referencias a todas las secciones del cuerpo principal
+    const secciones = {
+        nueva: document.getElementById('seccionNuevaOrden'),
+        busqueda: document.getElementById('seccionBusquedaOrdenes'),
+        mayorista: document.getElementById('seccionMayorista'),
+        stock: document.getElementById('seccionStock'),
+        informes: document.getElementById('seccionInformes'),
+        usuarios: document.getElementById('seccionUsuarios')
+    };
 
-    const bNavNueva = document.getElementById('bottomNavNueva');
-    const bNavBusqueda = document.getElementById('bottomNavBusqueda');
-    const bNavMayorista = document.getElementById('bottomNavMayorista');
+    // Alternar visibilidad de las pantallas (SPA completo)
+    Object.keys(secciones).forEach(key => {
+        const el = secciones[key];
+        if (el) {
+            if (key === seccion) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        }
+    });
 
+    // Control de KPIs superiores: visibles únicamente en Nueva y Búsqueda
+    const kpisSuperiores = document.getElementById('contenedorKpisSuperiores');
+    if (kpisSuperiores) {
+        if (seccion === 'nueva' || seccion === 'busqueda') kpisSuperiores.classList.remove('hidden');
+        else kpisSuperiores.classList.add('hidden');
+    }
+
+    // Estilos dinámicos para los botones de navegación
     const bgActivo = esIncanto ? 'bg-rose-600' : 'bg-sky-600';
     const textActivo = esIncanto ? 'text-rose-400' : 'text-sky-400';
 
-    const kpisSuperiores = document.getElementById('contenedorKpisSuperiores');
+    const sideBtns = {
+        nueva: document.getElementById('sideNavNueva'),
+        busqueda: document.getElementById('sideNavBusqueda'),
+        stock: document.getElementById('sideNavStock'),
+        informes: document.getElementById('btnMenuInformes'),
+        mayorista: document.getElementById('sideNavMayorista'),
+        usuarios: document.getElementById('btnMenuUsuarios')
+    };
 
-    // Manejo de visibilidad estricta de Incanto Mayorista (incluso para admin en Panatech)
-    if (sideMayorista) {
-        sideMayorista.style.display = puedeMayorista ? 'flex' : 'none';
-        if (!puedeMayorista) sideMayorista.classList.add('hidden');
-        else sideMayorista.classList.remove('hidden');
+    const bottomBtns = {
+        nueva: document.getElementById('bottomNavNueva'),
+        busqueda: document.getElementById('bottomNavBusqueda'),
+        stock: document.getElementById('bottomNavStock'),
+        informes: document.getElementById('bottomNavInformes'),
+        mayorista: document.getElementById('bottomNavMayorista'),
+        usuarios: document.getElementById('bottomNavUsuarios')
+    };
+
+    // Visibilidad especial de Mayorista
+    if (sideBtns.mayorista) {
+        sideBtns.mayorista.style.display = puedeMayorista ? 'flex' : 'none';
+        if (!puedeMayorista) sideBtns.mayorista.classList.add('hidden');
+        else sideBtns.mayorista.classList.remove('hidden');
     }
-    if (bNavMayorista) {
-        bNavMayorista.style.display = puedeMayorista ? 'flex' : 'none';
-        if (!puedeMayorista) bNavMayorista.classList.add('hidden');
-        else bNavMayorista.classList.remove('hidden');
+    if (bottomBtns.mayorista) {
+        bottomBtns.mayorista.style.display = puedeMayorista ? 'flex' : 'none';
+        if (!puedeMayorista) bottomBtns.mayorista.classList.add('hidden');
+        else bottomBtns.mayorista.classList.remove('hidden');
     }
 
-    if (seccion === 'nueva') {
-        if (secNueva) secNueva.classList.remove('hidden');
-        if (secBusqueda) secBusqueda.classList.add('hidden');
-        if (secMayorista) secMayorista.classList.add('hidden');
-        if (kpisSuperiores) kpisSuperiores.classList.remove('hidden');
+    // Estilos del menú lateral Desktop
+    const classInactivoSide = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
+    if (sideBtns.nueva) sideBtns.nueva.className = seccion === 'nueva' ? `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg` : classInactivoSide;
+    if (sideBtns.busqueda) sideBtns.busqueda.className = seccion === 'busqueda' ? `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg` : classInactivoSide;
+    if (sideBtns.stock) sideBtns.stock.className = seccion === 'stock' ? `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition bg-amber-600 text-white shadow-lg` : "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-amber-400 hover:bg-slate-700/70 transition border border-amber-500/20 bg-slate-900/40";
+    if (sideBtns.informes) sideBtns.informes.className = seccion === 'informes' ? `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow-lg` : "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-emerald-300 hover:bg-slate-700/70 transition border border-emerald-500/30 bg-emerald-950/40";
+    if (sideBtns.mayorista) sideBtns.mayorista.className = seccion === 'mayorista' ? `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition bg-pink-600 text-white shadow-lg` : "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40";
+    if (sideBtns.usuarios) sideBtns.usuarios.className = seccion === 'usuarios' ? `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition bg-violet-600 text-white shadow-lg` : "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-violet-300 hover:bg-slate-700/70 transition border border-violet-500/40 bg-violet-950/40";
 
-        // Menú Lateral Desktop
-        if (sideNueva) {
-            sideNueva.className = `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg`;
-        }
-        if (sideBusqueda) {
-            sideBusqueda.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
-        }
-        if (sideMayorista && puedeMayorista) {
-            sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40";
-        }
+    // Estilos de la barra inferior Móvil
+    const classInactivoBottom = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
+    if (bottomBtns.nueva) bottomBtns.nueva.className = seccion === 'nueva' ? `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo} font-bold` : classInactivoBottom;
+    if (bottomBtns.busqueda) bottomBtns.busqueda.className = seccion === 'busqueda' ? `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo} font-bold` : classInactivoBottom;
+    if (bottomBtns.stock) bottomBtns.stock.className = seccion === 'stock' ? `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-amber-400 font-bold` : classInactivoBottom;
+    if (bottomBtns.informes) bottomBtns.informes.className = seccion === 'informes' ? `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-emerald-400 font-bold` : classInactivoBottom;
+    if (bottomBtns.mayorista) bottomBtns.mayorista.className = seccion === 'mayorista' ? `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-pink-400 font-bold` : classInactivoBottom;
+    if (bottomBtns.usuarios) bottomBtns.usuarios.className = seccion === 'usuarios' ? `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-violet-400 font-bold` : classInactivoBottom;
 
-        // Barra Móvil
-        if (bNavNueva) {
-            bNavNueva.className = `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo}`;
-        }
-        if (bNavBusqueda) {
-            bNavBusqueda.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
-        }
-        if (bNavMayorista && puedeMayorista) {
-            bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-pink-400";
-        }
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (seccion === 'busqueda') {
-        if (secNueva) secNueva.classList.add('hidden');
-        if (secBusqueda) secBusqueda.classList.remove('hidden');
-        if (secMayorista) secMayorista.classList.add('hidden');
-        if (kpisSuperiores) kpisSuperiores.classList.remove('hidden');
-
-        // Menú Lateral Desktop
-        if (sideNueva) {
-            sideNueva.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
-        }
-        if (sideBusqueda) {
-            sideBusqueda.className = `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition ${bgActivo} text-white shadow-lg`;
-        }
-        if (sideMayorista && puedeMayorista) {
-            sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-pink-300 hover:bg-slate-700/70 transition border border-pink-500/40 bg-pink-950/40";
-        }
-
-        // Barra Móvil
-        if (bNavNueva) {
-            bNavNueva.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
-        }
-        if (bNavBusqueda) {
-            bNavBusqueda.className = `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${textActivo}`;
-        }
-        if (bNavMayorista && puedeMayorista) {
-            bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-pink-400";
-        }
-
-        // Si la lista está vacía o es la primera vez que se entra, buscar órdenes
+    // Disparadores específicos por sección
+    if (seccion === 'busqueda') {
         ejecutarBusquedaAvanzada();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (seccion === 'mayorista' && puedeMayorista) {
-        if (secNueva) secNueva.classList.add('hidden');
-        if (secBusqueda) secBusqueda.classList.add('hidden');
-        if (secMayorista) secMayorista.classList.remove('hidden');
-        if (kpisSuperiores) kpisSuperiores.classList.add('hidden');
-
-        // Menú Lateral Desktop
-        if (sideNueva) {
-            sideNueva.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
-        }
-        if (sideBusqueda) {
-            sideBusqueda.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700/70 transition border border-transparent";
-        }
-        if (sideMayorista) {
-            sideMayorista.className = "w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition bg-pink-600 text-white shadow-lg";
-        }
-
-        // Barra Móvil
-        if (bNavNueva) {
-            bNavNueva.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
-        }
-        if (bNavBusqueda) {
-            bNavBusqueda.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-slate-200";
-        }
-        if (bNavMayorista) {
-            bNavMayorista.className = "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-pink-400 font-bold";
-        }
-
+    } else if (seccion === 'mayorista') {
         inicializarModuloMayorista();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (seccion === 'stock') {
+        configurarEncabezadoStock();
+        cargarCatalogoProductos();
+    } else if (seccion === 'usuarios') {
+        cancelarEdicionUsuario();
+        cargarListaUsuarios();
     }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function irABusquedaConFiltro(estado) {
@@ -1174,14 +1164,14 @@ function cerrarModal() {
 // ==========================================
 // MODAL EXPORTAR EXCEL AVANZADO
 // ==========================================
+// INFORMES Y PRESENTACIONES
+// ==========================================
 function abrirModalExportar() { 
-    if (!usuarioTienePermisoInformes()) {
-        showToast('No tenés permisos para acceder al menú de informes.', 'warning');
-        return;
-    }
-    document.getElementById('modalExportar').classList.remove('hidden'); 
+    cambiarSeccion('informes');
 }
-function cerrarModalExportar() { document.getElementById('modalExportar').classList.add('hidden'); }
+function cerrarModalExportar() { 
+    cambiarSeccion('nueva');
+}
 
 function setPresetExport(tipo) {
     const hoyStr = new Date().toISOString().split('T')[0];
@@ -1250,12 +1240,18 @@ let CATALOGO_FILTRO_STOCK = 'todos'; // 'todos' | 'con_stock' | 'sin_stock' | 'w
 let CATALOGO_BUSQUEDA = '';
 let CATALOGO_ORDEN = 'nombre_asc';
 let CATALOGO_CARGANDO = false;
+let STOCK_VIEW_MODE = localStorage.getItem('stock_vista_modo') || 'grid';
 
 function abrirModalStock() {
-    const modal = document.getElementById('modalStock');
-    if (!modal) return;
-    modal.classList.remove('hidden');
+    cambiarSeccion('stock');
+}
 
+function cerrarModalStock() {
+    cambiarSeccion('nueva');
+    cerrarModalEditarRapido();
+}
+
+function configurarEncabezadoStock() {
     const badgeMarca = document.getElementById('badgeMarcaStock');
     const subtitulo = document.getElementById('subtituloStock');
     const btnSync = document.getElementById('btnSyncWebPanatech');
@@ -1278,20 +1274,47 @@ function abrirModalStock() {
     if (btnSync) {
         btnSync.style.display = 'flex';
         btnSync.className = esPanatech
-            ? 'bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95'
-            : 'bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95';
+            ? 'bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold py-2 px-3 rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95'
+            : 'bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold py-2 px-3 rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95';
     }
     if (pillWeb) pillWeb.style.display = 'inline-block';
     if (pillManual) pillManual.style.display = 'inline-block';
 
-    // Cargar productos
-    cargarCatalogoProductos();
+    cambiarVistaStock(STOCK_VIEW_MODE);
 }
 
-function cerrarModalStock() {
-    const modal = document.getElementById('modalStock');
-    if (modal) modal.classList.add('hidden');
-    cerrarModalEditarRapido();
+function cambiarVistaStock(modo) {
+    STOCK_VIEW_MODE = modo;
+    try {
+        localStorage.setItem('stock_vista_modo', modo);
+    } catch (e) {}
+
+    const btnGrid = document.getElementById('btnVistaStockGrid');
+    const btnList = document.getElementById('btnVistaStockList');
+    const contGrid = document.getElementById('contenedorGridProductos');
+    const contList = document.getElementById('contenedorListaProductos');
+
+    if (modo === 'list') {
+        if (btnGrid) {
+            btnGrid.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white';
+        }
+        if (btnList) {
+            btnList.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold transition bg-amber-500 text-slate-950 shadow';
+        }
+        if (contGrid) contGrid.classList.add('hidden');
+        if (contList) contList.classList.remove('hidden');
+    } else {
+        if (btnGrid) {
+            btnGrid.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold transition bg-amber-500 text-slate-950 shadow';
+        }
+        if (btnList) {
+            btnList.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white';
+        }
+        if (contGrid) contGrid.classList.remove('hidden');
+        if (contList) contList.classList.add('hidden');
+    }
+
+    renderizarCatalogoFiltrado();
 }
 
 async function cargarCatalogoProductos() {
@@ -1299,12 +1322,23 @@ async function cargarCatalogoProductos() {
     CATALOGO_CARGANDO = true;
 
     const grid = document.getElementById('listaProductosStockGrid');
+    const tabla = document.getElementById('listaProductosStockTabla');
     if (grid) {
         grid.innerHTML = `
             <div class="col-span-full py-16 flex flex-col items-center justify-center text-slate-400 space-y-3">
                 <div class="animate-spin text-3xl text-amber-500">⏳</div>
                 <p class="text-xs font-semibold">Cargando catálogo de productos y stock...</p>
             </div>
+        `;
+    }
+    if (tabla) {
+        tabla.innerHTML = `
+            <tr>
+                <td colspan="6" class="py-16 text-center text-slate-400">
+                    <div class="inline-block animate-spin text-2xl text-amber-500 mb-2">⏳</div>
+                    <p class="text-xs font-semibold">Cargando catálogo de productos y stock...</p>
+                </td>
+            </tr>
         `;
     }
 
@@ -1333,11 +1367,17 @@ async function cargarCatalogoProductos() {
             if (grid) {
                 grid.innerHTML = `<div class="col-span-full py-12 text-center text-xs text-rose-400">Error al cargar productos.</div>`;
             }
+            if (tabla) {
+                tabla.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-xs text-rose-400">Error al cargar productos.</td></tr>`;
+            }
         }
     } catch (err) {
         console.error('Error al cargar catálogo:', err);
         if (grid) {
             grid.innerHTML = `<div class="col-span-full py-12 text-center text-xs text-rose-400">Error de conexión al cargar catálogo.</div>`;
+        }
+        if (tabla) {
+            tabla.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-xs text-rose-400">Error de conexión al cargar catálogo.</td></tr>`;
         }
     } finally {
         CATALOGO_CARGANDO = false;
@@ -1417,8 +1457,9 @@ function setFiltroStock(filtro) {
 
 function renderizarCatalogoFiltrado() {
     const grid = document.getElementById('listaProductosStockGrid');
+    const tabla = document.getElementById('listaProductosStockTabla');
     const resumen = document.getElementById('resumenContadorProductos');
-    if (!grid) return;
+    if (!grid && !tabla) return;
 
     let filtrados = CATALOGO_PRODUCTOS;
 
@@ -1447,109 +1488,364 @@ function renderizarCatalogoFiltrado() {
         resumen.textContent = `Mostrando ${filtrados.length} productos (${conS} con stock, ${sinS} sin stock)`;
     }
 
-    if (filtrados.length === 0) {
-        grid.innerHTML = `
-            <div class="col-span-full py-16 flex flex-col items-center justify-center text-slate-400 space-y-3">
-                <div class="text-4xl">🔍</div>
-                <p class="text-xs font-bold text-white">No se encontraron productos con los filtros seleccionados</p>
-                <button type="button" onclick="setFiltroStock('todos'); limpiarBusquedaCatalogo();" class="text-xs text-amber-400 hover:underline">
-                    Restablecer filtros y ver todos
-                </button>
-            </div>
-        `;
+    // 1. Renderizar Vista Cuadrícula (Cards)
+    if (grid) {
+        if (filtrados.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full py-16 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                    <div class="text-4xl">🔍</div>
+                    <p class="text-xs font-bold text-white">No se encontraron productos con los filtros seleccionados</p>
+                    <button type="button" onclick="setFiltroStock('todos'); limpiarBusquedaCatalogo();" class="text-xs text-amber-400 hover:underline">
+                        Restablecer filtros y ver todos
+                    </button>
+                </div>
+            `;
+        } else {
+            grid.innerHTML = filtrados.map(p => {
+                const tieneStock = p.stock > 0;
+                const badgeStock = tieneStock
+                    ? `<span class="bg-emerald-950/90 text-emerald-400 border border-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">🟢 ${p.stock} u.</span>`
+                    : `<span class="bg-rose-950/90 text-rose-400 border border-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">🔴 Sin stock</span>`;
+
+                const badgeOrigen = p.synced_web
+                    ? `<span class="bg-sky-950/90 text-sky-400 border border-sky-800/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">🌐 Web</span>`
+                    : `<span class="bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-md">📁 Sistema</span>`;
+
+                const tieneVariante = p.variante && p.variante.trim() !== '' && p.variante.toLowerCase() !== 'única' && p.variante.toLowerCase() !== 'unica';
+                const badgeVariante = tieneVariante
+                    ? `<span class="bg-indigo-950/90 text-indigo-300 border border-indigo-700/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow">🎨 ${escapeHtml(p.variante)}</span>`
+                    : '';
+
+                const precioFormateado = (p.precio || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                const precioListaFormateado = (p.precio_lista && p.precio_lista > p.precio)
+                    ? `<span class="text-[10px] text-slate-500 line-through">$${p.precio_lista.toLocaleString('es-AR')} lista</span>`
+                    : '';
+
+                return `
+                    <div class="bg-slate-850 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-3 flex flex-col justify-between transition group shadow-lg">
+                        <!-- Imagen y Badges -->
+                        <div class="relative bg-slate-950 rounded-xl overflow-hidden mb-2.5 border border-slate-800 flex items-center justify-center h-40">
+                            <img src="${p.imagen_url || '/img/no-image.svg'}" 
+                                 alt="${escapeHtml(p.nombre)}" 
+                                 loading="lazy"
+                                 onerror="this.onerror=null; this.src='/img/no-image.svg';" 
+                                 class="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-300">
+                            
+                            <div class="absolute top-2 left-2 flex items-center gap-1 flex-wrap max-w-[70%]">
+                                ${badgeOrigen}
+                                ${badgeVariante}
+                            </div>
+
+                            <div class="absolute top-2 right-2">
+                                ${badgeStock}
+                            </div>
+
+                            ${p.url_tienda ? `
+                                <a href="${p.url_tienda}" target="_blank" rel="noopener noreferrer" title="Ver en tienda online" class="absolute bottom-2 right-2 bg-slate-900/90 hover:bg-sky-600 text-slate-300 hover:text-white p-1.5 rounded-lg border border-slate-700 transition">
+                                    <span class="text-xs">🔗</span>
+                                </a>
+                            ` : ''}
+                        </div>
+
+                        <!-- Info -->
+                        <div class="space-y-1.5 flex-1 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                                    <span>${escapeHtml(p.codigo_sku || 'S/N')}</span>
+                                    ${tieneVariante ? `<span class="text-indigo-400 font-bold truncate ml-1 max-w-[120px]">🎨 ${escapeHtml(p.variante)}</span>` : ''}
+                                </div>
+                                <h4 class="text-xs font-bold text-white line-clamp-2 mt-0.5 leading-snug group-hover:text-amber-400 transition" title="${escapeHtml(p.nombre)}">
+                                    ${escapeHtml(p.nombre)}
+                                </h4>
+                            </div>
+
+                            <!-- Precios -->
+                            <div class="pt-2 border-t border-slate-800/80 flex items-baseline justify-between">
+                                <div>
+                                    <span class="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider">Efectivo / Transf.</span>
+                                    <span class="text-sm font-extrabold text-emerald-400">
+                                        $${precioFormateado}
+                                    </span>
+                                </div>
+                                <div class="text-right">
+                                    ${precioListaFormateado}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botones de Acción -->
+                        <div class="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1.5">
+                            <button type="button" onclick="abrirModalEditarPorId(${p.id})" class="flex-1 bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-200 text-xs font-bold py-2 px-3 rounded-xl border border-slate-700 hover:border-amber-500 transition flex items-center justify-center gap-1.5 shadow active:scale-95">
+                                <span>✏️</span>
+                                <span>Editar</span>
+                            </button>
+                            <button type="button" onclick="abrirModalUnificarProductos(${p.id})" title="Unificar con otro producto" class="bg-slate-800 hover:bg-violet-900/80 text-slate-400 hover:text-violet-300 border border-slate-700 hover:border-violet-600 p-2 rounded-xl text-xs font-bold transition flex items-center justify-center shadow active:scale-95">
+                                <span>🔗</span>
+                            </button>
+                            <button type="button" onclick="eliminarProductoPorId(${p.id})" title="Eliminar producto" class="bg-slate-800 hover:bg-rose-900/80 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-600 p-2 rounded-xl text-xs font-bold transition flex items-center justify-center shadow active:scale-95">
+                                <span>🗑️</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // 2. Renderizar Vista Lista (Tabla con Casilla de Stock Editable Dinámica)
+    if (tabla) {
+        if (filtrados.length === 0) {
+            tabla.innerHTML = `
+                <tr>
+                    <td colspan="6" class="py-12 text-center text-slate-400">
+                        No se encontraron productos con los filtros seleccionados.
+                    </td>
+                </tr>
+            `;
+        } else {
+            tabla.innerHTML = filtrados.map(p => {
+                const tieneStock = p.stock > 0;
+                const tieneVariante = p.variante && p.variante.trim() !== '' && p.variante.toLowerCase() !== 'única' && p.variante.toLowerCase() !== 'unica';
+                const badgeVariante = tieneVariante
+                    ? `<span class="bg-indigo-950/80 text-indigo-300 border border-indigo-700/60 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">🎨 ${escapeHtml(p.variante)}</span>`
+                    : '';
+                const badgeOrigen = p.synced_web
+                    ? `<span class="bg-sky-950/80 text-sky-400 border border-sky-800/80 text-[10px] font-bold px-1.5 py-0.5 rounded">🌐 Web</span>`
+                    : `<span class="bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold px-1.5 py-0.5 rounded">📁 Sistema</span>`;
+
+                const precioFormateado = (p.precio || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                const precioListaTxt = (p.precio_lista && p.precio_lista > p.precio)
+                    ? `<span class="block text-[10px] text-slate-500 line-through">$${p.precio_lista.toLocaleString('es-AR')} lista</span>`
+                    : '';
+
+                return `
+                    <tr class="hover:bg-slate-850/80 transition group border-b border-slate-800/80 last:border-b-0">
+                        <!-- Foto -->
+                        <td class="py-2.5 px-3 text-center">
+                            <div class="w-12 h-12 mx-auto rounded-lg overflow-hidden bg-slate-950 border border-slate-800 p-0.5 flex items-center justify-center shadow-inner">
+                                <img src="${p.imagen_url || '/img/no-image.svg'}" 
+                                     alt="${escapeHtml(p.nombre)}" 
+                                     loading="lazy" 
+                                     onerror="this.onerror=null; this.src='/img/no-image.svg';" 
+                                     class="w-full h-full object-contain">
+                            </div>
+                        </td>
+
+                        <!-- Producto y Variante -->
+                        <td class="py-2.5 px-3">
+                            <div class="font-bold text-white text-xs leading-snug group-hover:text-amber-400 transition" title="${escapeHtml(p.nombre)}">
+                                ${escapeHtml(p.nombre)}
+                            </div>
+                            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                                ${badgeOrigen}
+                                ${badgeVariante}
+                            </div>
+                        </td>
+
+                        <!-- SKU -->
+                        <td class="py-2.5 px-3 font-mono text-[11px] text-slate-400">
+                            ${escapeHtml(p.codigo_sku || 'S/N')}
+                        </td>
+
+                        <!-- Precio -->
+                        <td class="py-2.5 px-3 text-right">
+                            <span class="font-black text-emerald-400 text-xs">$${precioFormateado}</span>
+                            ${precioListaTxt}
+                        </td>
+
+                        <!-- Casilla de Stock Dinámica -->
+                        <td class="py-2.5 px-3 text-center">
+                            <div class="inline-flex items-center gap-1.5">
+                                <input type="number" min="0" value="${p.stock}" id="inputStock_${p.id}"
+                                       onchange="guardarStockDinamico(${p.id}, this.value, this)"
+                                       onkeydown="if(event.key==='Enter') this.blur()"
+                                       class="w-20 bg-slate-950 border ${tieneStock ? 'border-slate-700 text-emerald-400' : 'border-rose-800 text-rose-400 bg-rose-950/20'} text-center font-black rounded-lg py-1 px-1.5 text-xs focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition shadow-inner"
+                                       title="Editá el stock y presioná Enter o hacé clic afuera para guardar al instante" />
+                                <span id="stockFeedback_${p.id}" class="text-[10px] text-emerald-400 font-bold opacity-0 transition-opacity">✓</span>
+                            </div>
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="py-2.5 px-3 text-center">
+                            <div class="inline-flex items-center gap-1">
+                                <button type="button" onclick="abrirModalEditarPorId(${p.id})" title="Editar datos completos" class="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-300 transition">
+                                    ✏️
+                                </button>
+                                <button type="button" onclick="abrirModalUnificarProductos(${p.id})" title="Unificar con otro producto" class="p-1.5 rounded-lg bg-slate-800 hover:bg-violet-800 text-slate-300 transition">
+                                    🔗
+                                </button>
+                                <button type="button" onclick="eliminarProductoPorId(${p.id})" title="Eliminar producto" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-800 text-slate-300 transition">
+                                    🗑️
+                                </button>
+                                ${p.url_tienda ? `
+                                    <a href="${p.url_tienda}" target="_blank" rel="noopener noreferrer" title="Ver en tienda online" class="p-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-slate-300 transition">
+                                        🌐
+                                    </a>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+}
+
+// Actualizar Stock de forma rápida y dinámica desde la casilla de la lista
+async function guardarStockDinamico(id, nuevoStock, inputEl) {
+    const val = parseInt(nuevoStock);
+    if (isNaN(val) || val < 0) {
+        showToast('El stock debe ser un número entero mayor o igual a 0.', 'warning');
+        if (inputEl) {
+            const prod = CATALOGO_PRODUCTOS.find(p => p.id === id);
+            inputEl.value = prod ? prod.stock : 0;
+        }
         return;
     }
 
-    grid.innerHTML = filtrados.map(p => {
-        const tieneStock = p.stock > 0;
-        const badgeStock = tieneStock
-            ? `<span class="bg-emerald-950/90 text-emerald-400 border border-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">🟢 ${p.stock} u.</span>`
-            : `<span class="bg-rose-950/90 text-rose-400 border border-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">🔴 Sin stock</span>`;
+    const feedback = document.getElementById(`stockFeedback_${id}`);
+    if (inputEl) {
+        inputEl.classList.add('border-amber-400', 'bg-amber-950/20');
+    }
 
-        const badgeOrigen = p.synced_web
-            ? `<span class="bg-sky-950/90 text-sky-400 border border-sky-800/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">🌐 Web</span>`
-            : `<span class="bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-md">📁 Sistema</span>`;
+    try {
+        const res = await fetch(`/api/productos/${id}/stock`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock: val })
+        });
+        const data = await res.json();
 
-        const tieneVariante = p.variante && p.variante.trim() !== '' && p.variante.toLowerCase() !== 'única' && p.variante.toLowerCase() !== 'unica';
-        const badgeVariante = tieneVariante
-            ? `<span class="bg-indigo-950/90 text-indigo-300 border border-indigo-700/80 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow">🎨 ${escapeHtml(p.variante)}</span>`
-            : '';
+        if (data.success) {
+            const prod = CATALOGO_PRODUCTOS.find(p => p.id === id);
+            if (prod) prod.stock = val;
+            actualizarContadoresStockPills(CATALOGO_PRODUCTOS);
 
-        const precioFormateado = (p.precio || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-        const precioListaFormateado = (p.precio_lista && p.precio_lista > p.precio)
-            ? `<span class="text-[10px] text-slate-500 line-through">$${p.precio_lista.toLocaleString('es-AR')} lista</span>`
-            : '';
+            if (inputEl) {
+                inputEl.classList.remove('border-amber-400', 'bg-amber-950/20');
+                if (val > 0) {
+                    inputEl.className = 'w-20 bg-slate-950 border border-emerald-500 text-emerald-400 text-center font-black rounded-lg py-1 px-1.5 text-xs focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition shadow-inner';
+                } else {
+                    inputEl.className = 'w-20 bg-slate-950 border border-rose-800 text-rose-400 bg-rose-950/20 text-center font-black rounded-lg py-1 px-1.5 text-xs focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition shadow-inner';
+                }
+            }
 
-        const jsonProd = JSON.stringify(p).replace(/"/g, '&quot;');
+            if (feedback) {
+                feedback.classList.remove('opacity-0');
+                setTimeout(() => feedback.classList.add('opacity-0'), 1500);
+            }
 
-        return `
-            <div class="bg-slate-850 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-3 flex flex-col justify-between transition group shadow-lg">
-                <!-- Imagen y Badges -->
-                <div class="relative bg-slate-950 rounded-xl overflow-hidden mb-2.5 border border-slate-800 flex items-center justify-center h-40">
-                    <img src="${p.imagen_url || '/img/no-image.svg'}" 
-                         alt="${p.nombre}" 
-                         loading="lazy"
-                         onerror="this.onerror=null; this.src='/img/no-image.svg';" 
-                         class="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-300">
-                    
-                    <div class="absolute top-2 left-2 flex items-center gap-1 flex-wrap max-w-[70%]">
-                        ${badgeOrigen}
-                        ${badgeVariante}
-                    </div>
+            showToast(`Stock actualizado a ${val} u.`, 'success');
+        } else {
+            showToast('Error al actualizar stock: ' + (data.error || ''), 'error');
+            if (inputEl) {
+                const prod = CATALOGO_PRODUCTOS.find(p => p.id === id);
+                inputEl.value = prod ? prod.stock : 0;
+            }
+        }
+    } catch (err) {
+        console.error('Error al guardar stock dinámico:', err);
+        showToast('Error de conexión al actualizar stock.', 'error');
+        if (inputEl) {
+            const prod = CATALOGO_PRODUCTOS.find(p => p.id === id);
+            inputEl.value = prod ? prod.stock : 0;
+        }
+    }
+}
 
-                    <div class="absolute top-2 right-2">
-                        ${badgeStock}
-                    </div>
+// Exportar Catálogo y Stock a archivo Excel (.xlsx)
+function exportarStockExcel() {
+    showToast(`Generando archivo Excel de stock para ${MARCA_ACTUAL.toUpperCase()}...`, 'info');
+    window.location.href = `/api/productos/exportar-excel?marca=${MARCA_ACTUAL}`;
+}
 
-                    ${p.url_tienda ? `
-                        <a href="${p.url_tienda}" target="_blank" rel="noopener noreferrer" title="Ver en tienda online" class="absolute bottom-2 right-2 bg-slate-900/90 hover:bg-sky-600 text-slate-300 hover:text-white p-1.5 rounded-lg border border-slate-700 transition">
-                            <span class="text-xs">🔗</span>
-                        </a>
-                    ` : ''}
-                </div>
+// Modal y Proceso de Importación de Excel
+function abrirModalImportarExcel() {
+    const modal = document.getElementById('modalImportarStockExcel');
+    if (!modal) return;
+    const input = document.getElementById('inputArchivoExcel');
+    if (input) input.value = '';
+    const label = document.getElementById('labelArchivoExcel');
+    if (label) label.textContent = 'Hacé clic acá para seleccionar tu archivo Excel (.xlsx)';
+    const prog = document.getElementById('progresoImportacionExcel');
+    if (prog) prog.classList.add('hidden');
+    const btn = document.getElementById('btnConfirmarImportacion');
+    if (btn) btn.disabled = false;
+    modal.classList.remove('hidden');
+}
 
-                <!-- Info -->
-                <div class="space-y-1.5 flex-1 flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                            <span>${p.codigo_sku || 'S/N'}</span>
-                            ${tieneVariante ? `<span class="text-indigo-400 font-bold truncate ml-1 max-w-[120px]">🎨 ${escapeHtml(p.variante)}</span>` : ''}
-                        </div>
-                        <h4 class="text-xs font-bold text-white line-clamp-2 mt-0.5 leading-snug group-hover:text-amber-400 transition" title="${p.nombre}">
-                            ${p.nombre}
-                        </h4>
-                    </div>
+function cerrarModalImportarExcel() {
+    const modal = document.getElementById('modalImportarStockExcel');
+    if (modal) modal.classList.add('hidden');
+}
 
-                    <!-- Precios -->
-                    <div class="pt-2 border-t border-slate-800/80 flex items-baseline justify-between">
-                        <div>
-                            <span class="text-[9px] text-slate-400 block font-semibold uppercase tracking-wider">Efectivo / Transf.</span>
-                            <span class="text-sm font-extrabold text-emerald-400">
-                                $${precioFormateado}
-                            </span>
-                        </div>
-                        <div class="text-right">
-                            ${precioListaFormateado}
-                        </div>
-                    </div>
-                </div>
+function mostrarArchivoSeleccionado(input) {
+    const label = document.getElementById('labelArchivoExcel');
+    if (input.files && input.files[0]) {
+        label.innerHTML = `📄 Archivo seleccionado: <b class="text-sky-300">${escapeHtml(input.files[0].name)}</b> (${(input.files[0].size / 1024).toFixed(1)} KB)`;
+    }
+}
 
-                <!-- Botones de Acción -->
-                <div class="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1.5">
-                    <button type="button" onclick="abrirModalEditarPorId(${p.id})" class="flex-1 bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-slate-200 text-xs font-bold py-2 px-3 rounded-xl border border-slate-700 hover:border-amber-500 transition flex items-center justify-center gap-1.5 shadow active:scale-95">
-                        <span>✏️</span>
-                        <span>Editar</span>
-                    </button>
-                    <button type="button" onclick="abrirModalUnificarProductos(${p.id})" title="Unificar con otro producto" class="bg-slate-800 hover:bg-violet-900/80 text-slate-400 hover:text-violet-300 border border-slate-700 hover:border-violet-600 p-2 rounded-xl text-xs font-bold transition flex items-center justify-center shadow active:scale-95">
-                        <span>🔗</span>
-                    </button>
-                    <button type="button" onclick="eliminarProductoPorId(${p.id})" title="Eliminar producto" class="bg-slate-800 hover:bg-rose-900/80 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-600 p-2 rounded-xl text-xs font-bold transition flex items-center justify-center shadow active:scale-95">
-                        <span>🗑️</span>
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
+async function ejecutarImportacionExcel(event) {
+    event.preventDefault();
+    const input = document.getElementById('inputArchivoExcel');
+    if (!input || !input.files || !input.files[0]) {
+        showToast('Por favor seleccioná un archivo Excel (.xlsx) primero.', 'warning');
+        return;
+    }
+
+    const file = input.files[0];
+    const prog = document.getElementById('progresoImportacionExcel');
+    const btn = document.getElementById('btnConfirmarImportacion');
+    if (prog) prog.classList.remove('hidden');
+    if (btn) btn.disabled = true;
+
+    try {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const arrayBuffer = e.target.result;
+                let binary = '';
+                const bytes = new Uint8Array(arrayBuffer);
+                const len = bytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64 = window.btoa(binary);
+
+                const res = await fetch('/api/productos/importar-excel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        marca: MARCA_ACTUAL,
+                        base64: base64,
+                        filename: file.name
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    cerrarModalImportarExcel();
+                    showToast(`¡Importación exitosa! ${data.actualizados} productos actualizados y ${data.creados} nuevos creados.`, 'success');
+                    cargarCatalogoProductos();
+                } else {
+                    showToast('Error al importar Excel: ' + (data.error || 'Error desconocido'), 'error');
+                }
+            } catch (errInner) {
+                console.error(errInner);
+                showToast('Error al procesar el archivo Excel: ' + errInner.message, 'error');
+            } finally {
+                if (prog) prog.classList.add('hidden');
+                if (btn) btn.disabled = false;
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } catch (err) {
+        console.error(err);
+        showToast('Error al leer el archivo: ' + err.message, 'error');
+        if (prog) prog.classList.add('hidden');
+        if (btn) btn.disabled = false;
+    }
 }
 
 // Sincronización Web con la tienda online (panatech.com.ar o incantorosario.com.ar)
@@ -2315,24 +2611,11 @@ let listaUsuariosEnMemoria = [];
 let usuarioEnEdicion = null;
 
 function abrirModalUsuarios() {
-    const user = (USUARIO_ACTUAL || '').toLowerCase().trim();
-    if (user !== 'npanadisi' && !ES_ADMIN) {
-        showToast('Solo el administrador npanadisi puede gestionar usuarios.', 'error');
-        return;
-    }
-    const modal = document.getElementById('modalUsuarios');
-    if (!modal) {
-        console.error('Modal modalUsuarios no encontrado en el DOM');
-        return;
-    }
-    modal.classList.remove('hidden');
-    cancelarEdicionUsuario();
-    cargarListaUsuarios();
+    cambiarSeccion('usuarios');
 }
 
 function cerrarModalUsuarios() {
-    document.getElementById('modalUsuarios').classList.add('hidden');
-    cancelarEdicionUsuario();
+    cambiarSeccion('nueva');
 }
 
 async function cargarListaUsuarios() {

@@ -2,7 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
-const { generarReporteVentasAvanzado } = require('./excelService');
+const {
+    generarReporteVentasAvanzado,
+    exportarCatalogoStockExcel,
+    procesarImportacionStockExcel
+} = require('./excelService');
 const { generarHTMLPresentacion } = require('./reportePresentacionService');
 const { generarHTMLReporteMayorista } = require('./reporteMayoristaService');
 const {
@@ -17,8 +21,8 @@ const {
 } = require('./panatechScraperService');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -466,6 +470,64 @@ app.get('/api/panatech/sync-info', async (req, res) => {
         const metadata = await obtenerMetadataMarca(supabase, marcaTarget);
         res.json({ success: true, info: metadata._info || null });
     } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// API Exportar Catálogo de Productos y Stock a Excel
+app.get('/api/productos/exportar-excel', async (req, res) => {
+    const marcaTarget = (req.query.marca || 'panatech').toLowerCase();
+    try {
+        const { data: dbProducts, error } = await supabase
+            .from('productos')
+            .select('*')
+            .eq('marca', marcaTarget)
+            .order('nombre', { ascending: true });
+
+        if (error) throw error;
+
+        const metadata = await obtenerMetadataMarca(supabase, marcaTarget);
+        const productosEnriquecidos = (dbProducts || []).map(p => {
+            const meta = metadata[p.id] || {};
+            return {
+                ...p,
+                imagen_url: meta.imagen_url || '/img/no-image.svg',
+                url_tienda: meta.url_tienda || '',
+                precio_lista: meta.precio_lista || 0,
+                synced_web: !!meta.synced_web,
+                variante: p.variante || meta.variante || 'Única'
+            };
+        });
+
+        const workbook = await exportarCatalogoStockExcel(productosEnriquecidos, marcaTarget);
+        const fechaStr = new Date().toISOString().slice(0, 10);
+        const filename = `Stock_${marcaTarget.toUpperCase()}_${fechaStr}.xlsx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        console.error('Error al exportar stock a Excel:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// API Importar Catálogo de Productos y Stock desde Excel
+app.post('/api/productos/importar-excel', async (req, res) => {
+    const { marca, base64 } = req.body;
+    const marcaTarget = (marca || 'panatech').toLowerCase();
+    if (!base64) {
+        return res.status(400).json({ success: false, error: 'No se envió el archivo Excel (base64 requerido).' });
+    }
+
+    try {
+        const buffer = Buffer.from(base64, 'base64');
+        const resultado = await procesarImportacionStockExcel(buffer, marcaTarget, supabase);
+        res.json(resultado);
+    } catch (err) {
+        console.error('Error al importar stock desde Excel:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });

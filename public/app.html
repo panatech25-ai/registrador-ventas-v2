@@ -66,13 +66,13 @@
                 </button>
 
                 <!-- Botón Stock / Precios -->
-                <button type="button" id="sideNavStock" onclick="abrirModalStock()" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-amber-400 hover:bg-slate-700/70 transition border border-amber-500/20 bg-slate-900/40">
+                <button type="button" id="sideNavStock" onclick="cambiarSeccion('stock')" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-amber-400 hover:bg-slate-700/70 transition border border-amber-500/20 bg-slate-900/40">
                     <span class="text-base">🏷️</span>
                     <span>Stock / Precios</span>
                 </button>
 
                 <!-- Botón Informes (Solo si tiene permiso) -->
-                <button id="btnMenuInformes" type="button" onclick="abrirModalExportar()" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-emerald-300 hover:bg-slate-700/70 transition border border-emerald-500/30 bg-emerald-950/40">
+                <button id="btnMenuInformes" type="button" onclick="cambiarSeccion('informes')" class="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-emerald-300 hover:bg-slate-700/70 transition border border-emerald-500/30 bg-emerald-950/40">
                     <span class="text-base">📊</span>
                     <span>Informes</span>
                 </button>
@@ -84,7 +84,7 @@
                 </button>
 
                 <!-- Botón Usuarios (Solo npanadisi) -->
-                <button id="btnMenuUsuarios" type="button" onclick="abrirModalUsuarios()" class="hidden w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-violet-300 hover:bg-slate-700/70 transition border border-violet-500/40 bg-violet-950/40">
+                <button id="btnMenuUsuarios" type="button" onclick="cambiarSeccion('usuarios')" class="hidden w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold text-violet-300 hover:bg-slate-700/70 transition border border-violet-500/40 bg-violet-950/40">
                     <span class="text-base">👥</span>
                     <span>Usuarios</span>
                 </button>
@@ -729,6 +729,349 @@
 
             </section>
 
+            <!-- ======================================================== -->
+            <!-- SECCIÓN 4: STOCK Y CATÁLOGO DE PRECIOS                   -->
+            <!-- ======================================================== -->
+            <section id="seccionStock" class="hidden space-y-4">
+                <div class="bg-slate-900 border border-slate-700/80 rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+                    
+                    <!-- HEADER -->
+                    <div class="bg-slate-800/90 px-4 sm:px-6 py-3.5 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xl text-amber-400">
+                                📦
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Stock y Catálogo de Precios</h3>
+                                    <span id="badgeMarcaStock" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800">Panatech</span>
+                                </div>
+                                <p id="subtituloStock" class="text-[11px] text-slate-400">
+                                    Precios en <span class="text-emerald-400 font-semibold">Efectivo o Transferencia</span> y control de inventario
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <!-- Selector de Modo de Vista (Tarjetas vs Lista) -->
+                            <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-700/80 shadow-inner">
+                                <button type="button" id="btnVistaStockGrid" onclick="cambiarVistaStock('grid')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition bg-amber-500 text-slate-950 shadow" title="Vista en tarjetas / cuadrícula">
+                                    ▦ <span class="hidden sm:inline ml-1">Tarjetas</span>
+                                </button>
+                                <button type="button" id="btnVistaStockList" onclick="cambiarVistaStock('list')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition text-slate-400 hover:text-white" title="Vista en lista con casilla de stock dinámica">
+                                    ☰ <span class="hidden sm:inline ml-1">Lista Dinámica</span>
+                                </button>
+                            </div>
+
+                            <!-- Botón Exportar Excel -->
+                            <button type="button" onclick="exportarStockExcel()" class="bg-emerald-700 hover:bg-emerald-600 text-emerald-100 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow active:scale-95" title="Exportar catálogo y stock actual a archivo Excel">
+                                <span>📤</span>
+                                <span class="hidden sm:inline">Exportar Excel</span>
+                            </button>
+
+                            <!-- Botón Importar Excel -->
+                            <button type="button" onclick="abrirModalImportarExcel()" class="bg-sky-700 hover:bg-sky-600 text-sky-100 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow active:scale-95" title="Importar o actualizar stock y precios desde un Excel">
+                                <span>📥</span>
+                                <span class="hidden sm:inline">Importar Excel</span>
+                            </button>
+
+                            <!-- Botón Sincronizar Web -->
+                            <button id="btnSyncWebPanatech" type="button" onclick="ejecutarSincronizacionWebPanatech()" class="bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold py-2 px-3 rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95">
+                                <span id="iconSyncWeb">🔄</span>
+                                <span id="textSyncWeb" class="hidden sm:inline">Sincronizar Tienda</span>
+                            </button>
+
+                            <!-- Botón Unificar Productos -->
+                            <button type="button" onclick="abrirModalUnificarProductos()" class="bg-violet-900/60 hover:bg-violet-800 text-violet-200 border border-violet-700/60 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow active:scale-95" title="Unificar dos productos duplicados trasladando historial">
+                                <span>🔗</span>
+                                <span class="hidden md:inline">Unificar</span>
+                            </button>
+
+                            <!-- Botón Agregar Producto Manual -->
+                            <button type="button" onclick="abrirModalManual()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center gap-1.5">
+                                <span>➕</span>
+                                <span class="hidden sm:inline">Nuevo Producto</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- BARRA DE BÚSQUEDA Y FILTROS -->
+                    <div class="bg-slate-850 px-4 sm:px-6 py-3 border-b border-slate-800 space-y-2.5 shrink-0">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                            <!-- Input de búsqueda -->
+                            <div class="relative flex-1">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+                                <input type="text" id="catalogoBuscarInput" oninput="onInputBusquedaCatalogo(this.value)" placeholder="Buscar por nombre, SKU o palabra clave..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-8 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
+                                <button type="button" id="btnLimpiarBuscarCat" onclick="limpiarBusquedaCatalogo()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-bold">✕</button>
+                            </div>
+
+                            <!-- Ordenamiento -->
+                            <div class="flex items-center gap-2">
+                                <label class="text-[11px] text-slate-400 font-semibold whitespace-nowrap hidden sm:inline">Ordenar:</label>
+                                <select id="catalogoOrdenSelect" onchange="cambiarOrdenCatalogo(this.value)" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                                    <option value="nombre_asc">Nombre (A - Z)</option>
+                                    <option value="stock_desc">Mayor Stock</option>
+                                    <option value="stock_asc">Menor Stock</option>
+                                    <option value="precio_desc">Mayor Precio</option>
+                                    <option value="precio_asc">Menor Precio</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Chips / Filtros rápidos -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div class="flex flex-wrap items-center gap-1.5" id="filtrosStockPills">
+                                <button type="button" onclick="setFiltroStock('todos')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 shadow transition" data-filter="todos">
+                                    Todos (<span id="countTodos">0</span>)
+                                </button>
+                                <button type="button" onclick="setFiltroStock('con_stock')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="con_stock">
+                                    🟢 Con Stock (<span id="countConStock">0</span>)
+                                </button>
+                                <button type="button" onclick="setFiltroStock('sin_stock')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="sin_stock">
+                                    🔴 Sin Stock (<span id="countSinStock">0</span>)
+                                </button>
+                                <button type="button" id="pillFiltroWeb" onclick="setFiltroStock('web')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="web">
+                                    🌐 Tienda Web (<span id="countWeb">0</span>)
+                                </button>
+                                <button type="button" id="pillFiltroManual" onclick="setFiltroStock('manual')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="manual">
+                                    📁 Solo Sistema (<span id="countManual">0</span>)
+                                </button>
+                            </div>
+
+                            <div id="infoUltimaSyncHeader" class="text-[11px] text-slate-400 italic"></div>
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR 1: VISTA DE TARJETAS (GRID) -->
+                    <div id="contenedorGridProductos" class="p-3 sm:p-5 bg-slate-900/60 min-h-[400px]">
+                        <div id="listaProductosStockGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                            <!-- Tarjetas renderizadas dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR 2: VISTA DE LISTA DINÁMICA (TABLA CON EDICIÓN RÁPIDA) -->
+                    <div id="contenedorListaProductos" class="hidden p-3 sm:p-5 bg-slate-900/60 min-h-[400px] overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-700/80 text-[11px] uppercase font-bold text-slate-400 bg-slate-950/70">
+                                    <th class="py-2.5 px-3 w-16 text-center">Foto</th>
+                                    <th class="py-2.5 px-3">Producto y Variante</th>
+                                    <th class="py-2.5 px-3 w-32">SKU</th>
+                                    <th class="py-2.5 px-3 w-36 text-right">Precio Efvo/Transf</th>
+                                    <th class="py-2.5 px-3 w-36 text-center">Stock Actual</th>
+                                    <th class="py-2.5 px-3 w-28 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="listaProductosStockTabla" class="divide-y divide-slate-800">
+                                <!-- Filas renderizadas dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- FOOTER RESUMEN -->
+                    <div class="bg-slate-800/90 px-4 sm:px-6 py-2.5 border-t border-slate-700/80 flex flex-wrap justify-between items-center text-xs text-slate-400 shrink-0">
+                        <span id="resumenContadorProductos">Cargando catálogo...</span>
+                        <span class="text-[11px] text-slate-400 hidden sm:inline">💡 En la vista lista, cambiá el valor en la <b class="text-amber-400">casilla de Stock</b> y se guarda al instante.</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================== -->
+            <!-- SECCIÓN 5: INFORMES Y PRESENTACIONES                     -->
+            <!-- ======================================================== -->
+            <section id="seccionInformes" class="hidden space-y-4">
+                <div class="bg-slate-800 border border-slate-700 p-5 sm:p-6 rounded-2xl max-w-4xl mx-auto space-y-5 shadow-xl">
+                    <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">📊</span>
+                            <div>
+                                <h3 class="text-sm sm:text-base font-bold text-emerald-400 uppercase tracking-wider">Centro de Informes y Presentaciones</h3>
+                                <p class="text-[10px] text-slate-400">Exportá métricas, reportes ejecutivos en PDF y dashboards avanzados en Excel.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-900/80 border border-slate-700/60 p-4 rounded-xl text-xs text-slate-300 space-y-2">
+                        <div class="font-bold text-white flex items-center gap-1">
+                            <span>✨ Formatos Disponibles:</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-1">
+                                <strong class="text-rose-400 block text-xs">📄 PDF Presentación</strong>
+                                Diapositivas ejecutivas A4 horizontales con gráficos y rankings listos para exponer.
+                            </div>
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-1">
+                                <strong class="text-emerald-400 block text-xs">📊 Excel Multi-Hoja</strong>
+                                Dashboard, fórmulas, KPIs y detalle granular ítem por ítem.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accesos rápidos de fechas -->
+                    <div class="space-y-1.5">
+                        <label class="block text-xs text-slate-400 font-bold uppercase tracking-wider">Período de Análisis</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="setPresetExport('hoy')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-xs py-2 rounded-xl border border-slate-700 font-semibold transition">Hoy</button>
+                            <button type="button" onclick="setPresetExport('mes')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-xs py-2 rounded-xl border border-slate-700 font-semibold transition">Este Mes</button>
+                            <button type="button" onclick="setPresetExport('todo')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-xs py-2 rounded-xl border border-slate-700 font-semibold transition">Todo el Historial</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 font-bold">Fecha Desde</label>
+                            <input type="date" id="exportFechaInicio" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 font-bold">Fecha Hasta</label>
+                            <input type="date" id="exportFechaFin" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+
+                    <!-- Botones de Acción de Exportación -->
+                    <div class="pt-3 border-t border-slate-700/80 space-y-2">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button type="button" onclick="descargarInformePDF()" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-xs py-3 px-4 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 active:scale-95">
+                                📄 <span>Descargar PDF Presentación</span>
+                            </button>
+                            <button type="button" onclick="abrirPresentacionEnPantalla()" class="bg-slate-700 hover:bg-slate-600 text-xs py-3 px-4 rounded-xl font-bold text-slate-200 border border-slate-600 shadow transition flex items-center justify-center gap-2">
+                                🖥️ <span>Ver Presentación en Pantalla</span>
+                            </button>
+                        </div>
+                        <div class="pt-1">
+                            <button type="button" onclick="descargarInformeExcel()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-xs py-3 px-4 rounded-xl font-bold text-emerald-100 shadow transition flex items-center justify-center gap-2 active:scale-95">
+                                📊 <span>Descargar Informe Completo en Excel (.xlsx)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================================================== -->
+            <!-- SECCIÓN 6: GESTIÓN DE USUARIOS Y PERMISOS                -->
+            <!-- ======================================================== -->
+            <section id="seccionUsuarios" class="hidden space-y-4">
+                <div class="bg-slate-800 border border-slate-700 p-4 sm:p-6 rounded-2xl max-w-3xl mx-auto space-y-5 shadow-xl">
+                    <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">👥</span>
+                            <div>
+                                <h3 class="text-sm sm:text-base font-bold text-violet-400 uppercase tracking-wider">Gestión de Usuarios y Permisos</h3>
+                                <p class="text-[10px] text-slate-400">Creá usuarios, asignales contraseñas y seleccioná a qué menús de cada marca tienen acceso.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botón para desplegar formulario de nuevo usuario -->
+                    <div class="flex justify-between items-center bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                        <span class="text-xs font-bold text-slate-300">Usuarios Registrados en el Sistema</span>
+                        <button type="button" onclick="mostrarFormularioNuevoUsuario()" class="bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow transition flex items-center gap-1.5 active:scale-95">
+                            ➕ Nuevo Usuario
+                        </button>
+                    </div>
+
+                    <!-- Lista de Usuarios Actuales -->
+                    <div id="listaUsuariosContainer" class="space-y-2">
+                        <p class="text-xs text-slate-400 italic p-3 text-center">Cargando usuarios...</p>
+                    </div>
+
+                    <!-- Formulario de Creación / Edición de Usuario -->
+                    <div id="formUsuarioContainer" class="hidden bg-slate-900/90 p-4 sm:p-5 rounded-xl border border-violet-500/30 space-y-4">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <h4 id="formUsuarioTitulo" class="text-xs font-bold text-violet-300 uppercase">Crear Nuevo Usuario</h4>
+                            <button type="button" onclick="cancelarEdicionUsuario()" class="text-[11px] text-slate-400 hover:text-white">✕ Cancelar</button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Nombre de Usuario</label>
+                                <input type="text" id="usrUsername" placeholder="Ej: maria" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Contraseña</label>
+                                <input type="text" id="usrPassword" placeholder="Contraseña de ingreso" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                        </div>
+
+                        <!-- Selección de Emprendimientos y Menús -->
+                        <div class="space-y-3 pt-2">
+                            <span class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">Permisos por Emprendimiento y Menú</span>
+
+                            <!-- Bloque Panatech -->
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-sky-500/30 space-y-2.5">
+                                <div class="flex items-center justify-between pb-1 border-b border-slate-700">
+                                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                                        <input type="checkbox" id="usrHabilitadoPanatech" onchange="togglePermisosMarca('panatech')" class="w-4 h-4 rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700">
+                                        <span class="text-xs font-bold text-sky-400">PANATECH (Acceso al emprendimiento)</span>
+                                    </label>
+                                    <span class="text-[10px] text-slate-400">Menús habilitados:</span>
+                                </div>
+
+                                <div id="permisosPanatechContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_pana_nueva" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
+                                        <span>➕ Nueva Orden</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_pana_busqueda" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
+                                        <span>🔍 Búsqueda</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_pana_stock" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
+                                        <span>🏷️ Stock / Precios</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_pana_informes" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
+                                        <span>📊 Informes</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Bloque Incanto -->
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-rose-500/30 space-y-2.5">
+                                <div class="flex items-center justify-between pb-1 border-b border-slate-700">
+                                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                                        <input type="checkbox" id="usrHabilitadoIncanto" onchange="togglePermisosMarca('incanto')" class="w-4 h-4 rounded text-rose-500 focus:ring-0 bg-slate-900 border-slate-700">
+                                        <span class="text-xs font-bold text-rose-400">INCANTO (Acceso al emprendimiento)</span>
+                                    </label>
+                                    <span class="text-[10px] text-slate-400">Menús habilitados:</span>
+                                </div>
+
+                                <div id="permisosIncantoContainer" class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs pt-1">
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_inca_nueva" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
+                                        <span>➕ Nueva Orden</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_inca_busqueda" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
+                                        <span>🔍 Búsqueda</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_inca_stock" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
+                                        <span>🏷️ Stock / Precios</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                                        <input type="checkbox" id="p_inca_informes" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
+                                        <span>📊 Informes</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-pink-300 font-semibold">
+                                        <input type="checkbox" id="p_inca_mayorista" class="rounded bg-slate-900 border-slate-700 text-pink-500 focus:ring-0">
+                                        <span>💎 Mayorista</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                            <button type="button" onclick="cancelarEdicionUsuario()" class="bg-slate-700 text-xs px-3 py-2 rounded-lg font-bold">Cancelar</button>
+                            <button type="button" onclick="guardarUsuarioForm()" class="bg-violet-600 hover:bg-violet-500 text-xs px-4 py-2 rounded-lg font-bold text-white shadow transition">
+                                💾 Guardar Usuario y Permisos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -749,13 +1092,13 @@
         </button>
 
         <!-- Botón Stock / Precios -->
-        <button type="button" id="bottomNavStock" onclick="abrirModalStock()" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-amber-400">
+        <button type="button" id="bottomNavStock" onclick="cambiarSeccion('stock')" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-amber-400">
             <span class="text-lg">🏷️</span>
             <span class="text-[10px] font-bold mt-0.5">Stock</span>
         </button>
 
         <!-- Botón Informes (Solo si tiene permiso) -->
-        <button type="button" id="bottomNavInformes" onclick="abrirModalExportar()" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-emerald-400">
+        <button type="button" id="bottomNavInformes" onclick="cambiarSeccion('informes')" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-emerald-400">
             <span class="text-lg">📊</span>
             <span class="text-[10px] font-bold mt-0.5">Informes</span>
         </button>
@@ -767,80 +1110,13 @@
         </button>
 
         <!-- Botón Usuarios (Solo npanadisi) -->
-        <button type="button" id="bottomNavUsuarios" onclick="abrirModalUsuarios()" class="hidden flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-violet-400">
+        <button type="button" id="bottomNavUsuarios" onclick="cambiarSeccion('usuarios')" class="hidden flex flex-col items-center justify-center py-1 px-3 rounded-xl transition text-slate-400 hover:text-violet-400">
             <span class="text-lg">👥</span>
             <span class="text-[10px] font-bold mt-0.5">Usuarios</span>
         </button>
     </nav>
 
-    <!-- Modal Informes y Presentaciones Ejecutivas -->
-    <div id="modalExportar" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 p-5 sm:p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-2.5">
-                <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    📊 Centro de Informes y Presentaciones
-                </h3>
-                <button onclick="cerrarModalExportar()" class="text-slate-400 hover:text-white text-sm font-bold">✕</button>
-            </div>
-            
-            <div class="bg-slate-900/80 border border-slate-700/60 p-3 rounded-xl text-[11px] text-slate-300 space-y-1.5">
-                <div class="font-bold text-white flex items-center gap-1">
-                    <span>✨ Formatos Disponibles:</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-[10px] pt-0.5">
-                    <div class="bg-slate-800/80 p-2 rounded-lg border border-slate-700/60">
-                        <strong class="text-rose-400 block text-[11px]">📄 PDF Presentación</strong>
-                        Diapositivas ejecutivas A4 horizontales con gráficos y rankings listos para exponer.
-                    </div>
-                    <div class="bg-slate-800/80 p-2 rounded-lg border border-slate-700/60">
-                        <strong class="text-emerald-400 block text-[11px]">📊 Excel Multi-Hoja</strong>
-                        Dashboard, fórmulas, KPIs y detalle granular ítem por ítem.
-                    </div>
-                </div>
-            </div>
 
-            <!-- Accesos rápidos de fechas -->
-            <div class="space-y-1.5">
-                <label class="block text-[10px] text-slate-400 font-bold uppercase">Período de Análisis</label>
-                <div class="grid grid-cols-3 gap-1.5">
-                    <button type="button" onclick="setPresetExport('hoy')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Hoy</button>
-                    <button type="button" onclick="setPresetExport('mes')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Este Mes</button>
-                    <button type="button" onclick="setPresetExport('todo')" class="bg-slate-900 hover:bg-slate-700 text-slate-300 text-[11px] py-1.5 rounded-lg border border-slate-700 font-semibold transition">Todo el Historial</button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                    <label class="block text-[10px] text-slate-400 mb-1 font-bold">Desde</label>
-                    <input type="date" id="exportFechaInicio" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] text-slate-400 mb-1 font-bold">Hasta</label>
-                    <input type="date" id="exportFechaFin" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none">
-                </div>
-            </div>
-
-            <!-- Botones de Acción de Exportación -->
-            <div class="pt-2 border-t border-slate-700/80 space-y-2">
-                <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="descargarInformePDF()" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-xs py-2.5 px-3 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-1.5 active:scale-95">
-                        📄 <span>Descargar PDF</span>
-                    </button>
-                    <button type="button" onclick="abrirPresentacionEnPantalla()" class="bg-slate-700 hover:bg-slate-600 text-xs py-2.5 px-3 rounded-xl font-bold text-slate-200 border border-slate-600 shadow transition flex items-center justify-center gap-1.5">
-                        🖥️ <span>Ver Presentación</span>
-                    </button>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="descargarInformeExcel()" class="flex-1 bg-emerald-700 hover:bg-emerald-600 text-xs py-2 px-3 rounded-xl font-bold text-emerald-100 shadow transition flex items-center justify-center gap-1.5">
-                        📊 <span>Descargar Excel Completo</span>
-                    </button>
-                    <button type="button" onclick="cerrarModalExportar()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs px-3 py-2 rounded-xl font-semibold">
-                        Cerrar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Modal Informes y Presentaciones Incanto Mayorista (PDF con Gráficos y KPIs) -->
     <div id="modalExportarMayorista" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -914,114 +1190,7 @@
         </div>
     </div>
 
-    <!-- Modal Catálogo, Stock y Precios (Modernizado con fotos, filtros y sincronización web) -->
-    <div id="modalStock" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
-        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-6xl w-full h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            
-            <!-- HEADER -->
-            <div class="bg-slate-800/90 px-4 sm:px-6 py-3.5 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xl text-amber-400">
-                        📦
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-sm sm:text-base font-bold text-white uppercase tracking-wider">Stock y Catálogo de Precios</h3>
-                            <span id="badgeMarcaStock" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800">Panatech</span>
-                        </div>
-                        <p id="subtituloStock" class="text-[11px] text-slate-400">
-                            Precios en <span class="text-emerald-400 font-semibold">Efectivo o Transferencia</span> y control de inventario
-                        </p>
-                    </div>
-                </div>
 
-                <div class="flex items-center gap-2">
-                    <!-- Botón Sincronizar Web (Exclusivo Panatech) -->
-                    <button id="btnSyncWebPanatech" type="button" onclick="ejecutarSincronizacionWebPanatech()" class="bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95">
-                        <span id="iconSyncWeb">🔄</span>
-                        <span id="textSyncWeb">Sincronizar Tienda Online</span>
-                    </button>
-
-                    <!-- Botón Unificar Productos -->
-                    <button type="button" onclick="abrirModalUnificarProductos()" class="bg-violet-900/60 hover:bg-violet-800 text-violet-200 border border-violet-700/60 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow active:scale-95" title="Unificar dos productos duplicados trasladando historial">
-                        <span>🔗</span>
-                        <span class="hidden sm:inline">Unificar Productos</span>
-                    </button>
-
-                    <!-- Botón Agregar Producto Manual -->
-                    <button type="button" onclick="abrirModalManual()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center gap-1.5">
-                        <span>➕</span>
-                        <span class="hidden sm:inline">Nuevo Producto</span>
-                    </button>
-
-                    <!-- Botón Cerrar -->
-                    <button type="button" onclick="cerrarModalStock()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm transition">
-                        ✕
-                    </button>
-                </div>
-            </div>
-
-            <!-- BARRA DE BÚSQUEDA Y FILTROS -->
-            <div class="bg-slate-850 px-4 sm:px-6 py-3 border-b border-slate-800 space-y-2.5 shrink-0">
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                    <!-- Input de búsqueda -->
-                    <div class="relative flex-1">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
-                        <input type="text" id="catalogoBuscarInput" oninput="onInputBusquedaCatalogo(this.value)" placeholder="Buscar por nombre, SKU o palabra clave..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-8 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
-                        <button type="button" id="btnLimpiarBuscarCat" onclick="limpiarBusquedaCatalogo()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-bold">✕</button>
-                    </div>
-
-                    <!-- Ordenamiento -->
-                    <div class="flex items-center gap-2">
-                        <label class="text-[11px] text-slate-400 font-semibold whitespace-nowrap hidden sm:inline">Ordenar:</label>
-                        <select id="catalogoOrdenSelect" onchange="cambiarOrdenCatalogo(this.value)" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
-                            <option value="nombre_asc">Nombre (A - Z)</option>
-                            <option value="stock_desc">Mayor Stock</option>
-                            <option value="stock_asc">Menor Stock</option>
-                            <option value="precio_desc">Mayor Precio</option>
-                            <option value="precio_asc">Menor Precio</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Chips / Filtros rápidos -->
-                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <div class="flex flex-wrap items-center gap-1.5" id="filtrosStockPills">
-                        <button type="button" onclick="setFiltroStock('todos')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 shadow transition" data-filter="todos">
-                            Todos (<span id="countTodos">0</span>)
-                        </button>
-                        <button type="button" onclick="setFiltroStock('con_stock')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="con_stock">
-                            🟢 Con Stock (<span id="countConStock">0</span>)
-                        </button>
-                        <button type="button" onclick="setFiltroStock('sin_stock')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="sin_stock">
-                            🔴 Sin Stock (<span id="countSinStock">0</span>)
-                        </button>
-                        <button type="button" id="pillFiltroWeb" onclick="setFiltroStock('web')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="web">
-                            🌐 Tienda Web (<span id="countWeb">0</span>)
-                        </button>
-                        <button type="button" id="pillFiltroManual" onclick="setFiltroStock('manual')" class="filtro-stock-btn px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-750 transition" data-filter="manual">
-                            📁 Solo Sistema (<span id="countManual">0</span>)
-                        </button>
-                    </div>
-
-                    <div id="infoUltimaSyncHeader" class="text-[11px] text-slate-400 italic"></div>
-                </div>
-            </div>
-
-            <!-- CONTENEDOR DE PRODUCTOS (GRID CON SCROLL) -->
-            <div id="contenedorGridProductos" class="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-900/60">
-                <div id="listaProductosStockGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                    <!-- Tarjetas de productos renderizadas dinámicamente -->
-                </div>
-            </div>
-
-            <!-- FOOTER RESUMEN -->
-            <div class="bg-slate-800/90 px-4 sm:px-6 py-2.5 border-t border-slate-700/80 flex flex-wrap justify-between items-center text-xs text-slate-400 shrink-0">
-                <span id="resumenContadorProductos">Cargando catálogo...</span>
-                <span class="text-[11px] text-slate-400 hidden sm:inline">💡 Clic en <b class="text-amber-400">"Editar"</b> en cualquier tarjeta para ajustar precio o stock</span>
-            </div>
-        </div>
-    </div>
 
     <!-- Modal Popup Edición Rápida de Producto -->
     <div id="modalEditarProdRapido" style="z-index: 70;" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-4">
@@ -1228,133 +1397,62 @@
         </div>
     </div>
 
-    <!-- Modal Gestión de Usuarios y Permisos (Solo npanadisi) -->
-    <div id="modalUsuarios" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-        <div class="bg-slate-800 border border-slate-700 p-4 sm:p-6 rounded-2xl max-w-2xl w-full space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
+    <!-- Modal para Importar Stock desde Excel -->
+    <div id="modalImportarStockExcel" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[75] flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-slate-800 border border-slate-700 p-5 sm:p-6 rounded-2xl max-w-lg w-full space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">👥</span>
+                    <span class="text-xl">📥</span>
                     <div>
-                        <h3 class="text-sm sm:text-base font-bold text-violet-400 uppercase tracking-wider">Gestión de Usuarios y Permisos</h3>
-                        <p class="text-[10px] text-slate-400">Creá usuarios, asignales contraseñas y seleccioná a qué menús de cada marca tienen acceso.</p>
+                        <h3 class="text-sm sm:text-base font-bold text-sky-400 uppercase tracking-wider">Importar Stock y Precios desde Excel</h3>
+                        <p class="text-[10px] text-slate-400">Cargá una planilla de Excel (.xlsx) para actualizar stock y precios de forma masiva.</p>
                     </div>
                 </div>
-                <button onclick="cerrarModalUsuarios()" class="text-slate-400 hover:text-white font-bold text-base px-2">✕</button>
+                <button type="button" onclick="cerrarModalImportarExcel()" class="text-slate-400 hover:text-white font-bold text-base px-2">✕</button>
             </div>
 
-            <!-- Botón para desplegar formulario de nuevo usuario -->
-            <div class="flex justify-between items-center bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
-                <span class="text-xs font-bold text-slate-300">Usuarios Registrados</span>
-                <button type="button" onclick="mostrarFormularioNuevoUsuario()" class="bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs py-1.5 px-3 rounded-lg shadow transition flex items-center gap-1">
-                    ➕ Nuevo Usuario
-                </button>
+            <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60 text-xs text-slate-300 space-y-2">
+                <div class="font-bold text-amber-400 flex items-center gap-1">
+                    <span>💡 Instrucciones:</span>
+                </div>
+                <ul class="list-disc list-inside space-y-1 text-[11px] text-slate-400">
+                    <li>Podés usar el archivo generado por <b class="text-emerald-400">Exportar Excel</b> como plantilla.</li>
+                    <li>El sistema buscará coincidencias por <b>ID</b>, por <b>SKU</b> o por <b>Nombre + Variante</b>.</li>
+                    <li>Modificá los valores de la columna <b>Stock</b> y <b>Precio</b> según necesites.</li>
+                    <li>Si agregás filas nuevas con nombre, se crearán como nuevos productos automáticamente.</li>
+                </ul>
             </div>
 
-            <!-- Lista de Usuarios Actuales -->
-            <div id="listaUsuariosContainer" class="space-y-2">
-                <p class="text-xs text-slate-400 italic p-2 text-center">Cargando usuarios...</p>
-            </div>
-
-            <!-- Formulario de Creación / Edición de Usuario -->
-            <div id="formUsuarioContainer" class="hidden bg-slate-900/90 p-4 rounded-xl border border-violet-500/30 space-y-4">
-                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                    <h4 id="formUsuarioTitulo" class="text-xs font-bold text-violet-300 uppercase">Crear Nuevo Usuario</h4>
-                    <button type="button" onclick="cancelarEdicionUsuario()" class="text-[11px] text-slate-400 hover:text-white">✕ Cancelar</button>
+            <form id="formImportarExcel" onsubmit="ejecutarImportacionExcel(event)" class="space-y-4">
+                <div class="border-2 border-dashed border-slate-600 hover:border-sky-500 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-900/40" onclick="document.getElementById('inputArchivoExcel').click()">
+                    <input type="file" id="inputArchivoExcel" accept=".xlsx, .xls" class="hidden" onchange="mostrarArchivoSeleccionado(this)">
+                    <div class="text-3xl mb-2">📊</div>
+                    <div id="labelArchivoExcel" class="text-xs font-semibold text-slate-300">
+                        Hacé clic acá para seleccionar tu archivo Excel (.xlsx)
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1">Formatos compatibles: Microsoft Excel (.xlsx, .xls)</p>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Nombre de Usuario</label>
-                        <input type="text" id="usrUsername" placeholder="Ej: maria" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                <div id="progresoImportacionExcel" class="hidden space-y-2">
+                    <div class="flex justify-between text-xs text-slate-300 font-semibold">
+                        <span id="textoProgresoImportacion">Procesando planilla e importando productos...</span>
+                        <span class="animate-spin text-sky-400">⏳</span>
                     </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Contraseña</label>
-                        <input type="text" id="usrPassword" placeholder="Contraseña de ingreso" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                    <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-700">
+                        <div class="bg-sky-500 h-2 rounded-full animate-pulse w-full"></div>
                     </div>
                 </div>
 
-                <!-- Selección de Emprendimientos y Menús -->
-                <div class="space-y-3 pt-2">
-                    <span class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">Permisos por Emprendimiento y Menú</span>
-
-                    <!-- Bloque Panatech -->
-                    <div class="bg-slate-800/80 p-3 rounded-xl border border-sky-500/30 space-y-2.5">
-                        <div class="flex items-center justify-between pb-1 border-b border-slate-700">
-                            <label class="flex items-center gap-2 cursor-pointer select-none">
-                                <input type="checkbox" id="usrHabilitadoPanatech" onchange="togglePermisosMarca('panatech')" class="w-4 h-4 rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700">
-                                <span class="text-xs font-bold text-sky-400">PANATECH (Acceso al emprendimiento)</span>
-                            </label>
-                            <span class="text-[10px] text-slate-400">Menús habilitados:</span>
-                        </div>
-
-                        <div id="permisosPanatechContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_pana_nueva" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
-                                <span>➕ Nueva Orden</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_pana_busqueda" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
-                                <span>🔍 Búsqueda</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_pana_stock" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
-                                <span>🏷️ Stock / Precios</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_pana_informes" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0">
-                                <span>📊 Informes</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Bloque Incanto -->
-                    <div class="bg-slate-800/80 p-3 rounded-xl border border-rose-500/30 space-y-2.5">
-                        <div class="flex items-center justify-between pb-1 border-b border-slate-700">
-                            <label class="flex items-center gap-2 cursor-pointer select-none">
-                                <input type="checkbox" id="usrHabilitadoIncanto" onchange="togglePermisosMarca('incanto')" class="w-4 h-4 rounded text-rose-500 focus:ring-0 bg-slate-900 border-slate-700">
-                                <span class="text-xs font-bold text-rose-400">INCANTO (Acceso al emprendimiento)</span>
-                            </label>
-                            <span class="text-[10px] text-slate-400">Menús habilitados:</span>
-                        </div>
-
-                        <div id="permisosIncantoContainer" class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs pt-1">
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_inca_nueva" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
-                                <span>➕ Nueva Orden</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_inca_busqueda" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
-                                <span>🔍 Búsqueda</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_inca_stock" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
-                                <span>🏷️ Stock / Precios</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-                                <input type="checkbox" id="p_inca_informes" class="rounded bg-slate-900 border-slate-700 text-rose-500 focus:ring-0">
-                                <span>📊 Informes</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 cursor-pointer text-pink-300 font-semibold">
-                                <input type="checkbox" id="p_inca_mayorista" class="rounded bg-slate-900 border-slate-700 text-pink-500 focus:ring-0">
-                                <span>💎 Mayorista</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                    <button type="button" onclick="cancelarEdicionUsuario()" class="bg-slate-700 text-xs px-3 py-2 rounded-lg font-bold">Cancelar</button>
-                    <button type="button" onclick="guardarUsuarioForm()" class="bg-violet-600 hover:bg-violet-500 text-xs px-4 py-2 rounded-lg font-bold text-white shadow transition">
-                        💾 Guardar Usuario y Permisos
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-700">
+                    <button type="button" onclick="cerrarModalImportarExcel()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold py-2 px-3.5 rounded-xl transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btnConfirmarImportacion" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95">
+                        <span>📤</span>
+                        <span>Procesar e Importar</span>
                     </button>
                 </div>
-            </div>
-
-            <div class="flex justify-end pt-2 border-t border-slate-700">
-                <button type="button" onclick="cerrarModalUsuarios()" class="bg-slate-700 hover:bg-slate-600 text-xs px-4 py-2 rounded-lg font-bold text-white">
-                    Cerrar
-                </button>
-            </div>
+            </form>
         </div>
     </div>
 
