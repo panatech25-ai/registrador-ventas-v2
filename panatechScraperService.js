@@ -66,6 +66,80 @@ function fetchPage(url, timeoutMs = 15000) {
     });
 }
 
+// ── Obtiene variantes de producto por streaming abortable ultrarrápido (primeros 70KB) ──
+function fetchVariantsQuick(url, timeoutMs = 5000) {
+    return new Promise((resolve) => {
+        if (!url || !url.startsWith('http')) return resolve(null);
+
+        const req = https.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            },
+            timeout: timeoutMs
+        }, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                let redirectUrl = res.headers.location;
+                if (redirectUrl.startsWith('/')) {
+                    try {
+                        const parsed = new URL(url);
+                        redirectUrl = `${parsed.origin}${redirectUrl}`;
+                    } catch (_) {}
+                }
+                return fetchVariantsQuick(redirectUrl, timeoutMs).then(resolve);
+            }
+
+            if (res.statusCode >= 400) {
+                return resolve(null);
+            }
+
+            let buffer = '';
+            let resolved = false;
+
+            res.on('data', (chunk) => {
+                if (resolved) return;
+                buffer += chunk;
+                const match = buffer.match(/LS\.variants\s*=\s*(\[[\s\S]*?\]);/);
+                if (match) {
+                    resolved = true;
+                    try {
+                        const parsed = JSON.parse(match[1]);
+                        req.destroy();
+                        return resolve(parsed);
+                    } catch (_) {
+                        // Esperar más chunks si el JSON no se completó en este chunk
+                    }
+                }
+                // Si ya leímos más de 90KB y no apareció LS.variants, abortar para no descargar megabytes innecesarios
+                if (buffer.length > 90000) {
+                    resolved = true;
+                    req.destroy();
+                    return resolve(null);
+                }
+            });
+
+            res.on('end', () => {
+                if (!resolved) {
+                    const match = buffer.match(/LS\.variants\s*=\s*(\[[\s\S]*?\]);/);
+                    if (match) {
+                        try {
+                            return resolve(JSON.parse(match[1]));
+                        } catch (_) {}
+                    }
+                    resolve(null);
+                }
+            });
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            resolve(null);
+        });
+
+        req.on('error', () => resolve(null));
+    });
+}
+
 function decodeHtmlEntities(str) {
     if (!str) return '';
     return str
@@ -264,25 +338,32 @@ async function scrapeTiendaProductos(marca = 'panatech') {
         currentStartPage += batchPages;
     }
 
-    // 3. Para productos con imágenes secundarias o posibles variantes, verificar variantes desde la ficha de producto
-    const prodsWithVariantsToCheck = allProducts.filter(p => p.hasSecondary && p.url);
+    // 3. Verificar variantes desde la ficha de cada producto
+    // Nota: Muchos productos con variantes (como opciones de color o modelo) no poseen imágenes secundarias en la grilla.
+    // - En Panatech (catálogo compacto de ~130 items) verificamos el 100% de los productos de forma ultrarrápida por streaming (< 3 seg).
+    // - En Incanto verificamos los productos con fotos secundarias o con pistas de variantes (colores, tonos, talle, packs).
+    const prodsWithVariantsToCheck = allProducts.filter(p => {
+        if (!p.url) return false;
+        if (brandKey === 'panatech') return true;
+        if (p.hasSecondary) return true;
+        const nombreNorm = normalizeName(p.name || '');
+        const tienePista = /negro|blanco|rosa|azul|verde|rojo|amarillo|dorado|plateado|gris|lila|violeta|naranja|beige|marron|celeste|bordo|fucsia|turquesa|pack|x[0-9]|talle|tono|color|surtido|dapop|variante|swatch/i.test(nombreNorm);
+        return tienePista;
+    });
+
     if (prodsWithVariantsToCheck.length > 0) {
-        console.log(`[Scraper ${brandKey.toUpperCase()}] Verificando variantes para ${prodsWithVariantsToCheck.length} productos con múltiples opciones...`);
-        const batchSizeVariants = 6;
+        console.log(`[Scraper ${brandKey.toUpperCase()}] Verificando variantes en detalle para ${prodsWithVariantsToCheck.length} productos...`);
+        const batchSizeVariants = 15;
         for (let i = 0; i < prodsWithVariantsToCheck.length; i += batchSizeVariants) {
             const batch = prodsWithVariantsToCheck.slice(i, i + batchSizeVariants);
             await Promise.all(batch.map(async (p) => {
                 try {
-                    const prodHtml = await fetchPage(p.url, 8000);
-                    const varMatch = prodHtml.match(/LS\.variants\s*=\s*(\[[\s\S]*?\]);/);
-                    if (varMatch) {
-                        const parsed = JSON.parse(varMatch[1]);
-                        if (Array.isArray(parsed) && parsed.length > 1 && parsed.some(v => v.option0)) {
-                            p.variants = parsed;
-                        }
+                    const parsed = await fetchVariantsQuick(p.url, 4500);
+                    if (Array.isArray(parsed) && parsed.length > 1 && parsed.some(v => v.option0 || v.option1)) {
+                        p.variants = parsed;
                     }
                 } catch (err) {
-                    // Mantener producto simple si falla la petición individual
+                    // Si falla el streaming, se mantiene como producto simple
                 }
             }));
         }
@@ -293,8 +374,9 @@ async function scrapeTiendaProductos(marca = 'panatech') {
     for (const p of allProducts) {
         if (p.variants && p.variants.length > 1) {
             for (const v of p.variants) {
-                if (!v.option0) continue;
-                const varName = String(v.option0).trim();
+                // Soporte para variantes simples (ej. Color) y combinadas (ej. Color / Talle)
+                const varOptions = [v.option0, v.option1, v.option2].filter(Boolean).map(s => String(s).trim());
+                const varName = varOptions.join(' / ') || 'Única';
                 let varImg = v.image_url ? (v.image_url.startsWith('//') ? 'https:' + v.image_url : v.image_url) : p.image;
 
                 let varStock = 0;
@@ -573,7 +655,8 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
                     return false;
                 }
 
-                if (sp.esVariante && varNorm && ['negro', 'blanco', 'rosa', 'azul', 'rojo', 'verde', 'gris', 'amarillo'].some(c => c !== varNorm && pNomNorm.includes(c))) {
+                const COLORES_CONOCIDOS = ['negro', 'blanco', 'rosa', 'azul', 'rojo', 'verde', 'gris', 'amarillo', 'celeste', 'lila', 'violeta', 'dorado', 'plateado', 'naranja', 'bordo', 'fucsia', 'turquesa', 'beige', 'marron', 'transparente'];
+                if (sp.esVariante && varNorm && COLORES_CONOCIDOS.some(c => c !== varNorm && pNomNorm.includes(c))) {
                     return false;
                 }
 
