@@ -512,16 +512,73 @@ function expandApiProducts(rawProducts, descuentoRatio = 0.85) {
     return expanded;
 }
 
-// ── Consulta catálogo completo mediante la API REST oficial de Tiendanube ──
-function fetchProductosTiendanubeAPI(brandKey) {
-    const config = BRAND_CONFIGS[brandKey];
-    if (!config) return Promise.resolve(null);
+// ── Helper para guardar credenciales de Tiendanube en Supabase ──
+async function guardarCredencialesTiendanube(supabase, brandKey, storeId, accessToken) {
+    if (!supabase) return false;
+    try {
+        const { data: existing } = await supabase
+            .from('ordenes')
+            .select('id, observaciones')
+            .eq('numero_orden', 'SYS_CONFIG_TIENDANUBE')
+            .maybeSingle();
 
-    const storeId = process.env[config.storeIdEnv];
-    const accessToken = process.env[config.accessTokenEnv];
+        let cfg = {};
+        if (existing && existing.observaciones) {
+            try { cfg = JSON.parse(existing.observaciones); } catch (_) {}
+        }
+        cfg[brandKey] = { storeId: String(storeId), accessToken: String(accessToken), actualizado_el: new Date().toISOString() };
+        const jsonStr = JSON.stringify(cfg);
+
+        if (existing && existing.id) {
+            await supabase.from('ordenes').update({ observaciones: jsonStr }).eq('id', existing.id);
+        } else {
+            await supabase.from('ordenes').insert([{
+                numero_orden: 'SYS_CONFIG_TIENDANUBE',
+                vendedor: 'sistema',
+                cliente_nombre: 'Credenciales Tiendanube API',
+                total: 0,
+                estado: 'Cancelado',
+                observaciones: jsonStr
+            }]);
+        }
+        return true;
+    } catch (e) {
+        console.error(`[Tiendanube API] Error guardando credenciales de ${brandKey} en Supabase:`, e.message);
+        return false;
+    }
+}
+
+// ── Consulta catálogo completo mediante la API REST oficial de Tiendanube ──
+async function fetchProductosTiendanubeAPI(brandKey, supabase = null) {
+    const config = BRAND_CONFIGS[brandKey];
+    if (!config) return null;
+
+    let storeId = process.env[config.storeIdEnv];
+    let accessToken = process.env[config.accessTokenEnv];
+
+    // Si no están en variables de entorno (por ejemplo en Vercel antes de cargarlas), consultar en Supabase
+    if ((!storeId || !accessToken) && supabase) {
+        try {
+            const { data: cfgRow } = await supabase
+                .from('ordenes')
+                .select('observaciones')
+                .eq('numero_orden', 'SYS_CONFIG_TIENDANUBE')
+                .maybeSingle();
+
+            if (cfgRow && cfgRow.observaciones) {
+                const parsed = JSON.parse(cfgRow.observaciones);
+                if (parsed && parsed[brandKey]) {
+                    storeId = storeId || parsed[brandKey].storeId;
+                    accessToken = accessToken || parsed[brandKey].accessToken;
+                }
+            }
+        } catch (e) {
+            console.warn(`[Tiendanube API] No se pudieron leer credenciales de Supabase:`, e.message);
+        }
+    }
 
     if (!storeId || !accessToken) {
-        return Promise.resolve(null);
+        return null;
     }
 
     const descuentoRatio = config.descuentoEfectivoRatio || 0.85;
@@ -722,7 +779,7 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
     let metodoSync = 'web_scraper';
 
     try {
-        const apiProds = await fetchProductosTiendanubeAPI(brandKey);
+        const apiProds = await fetchProductosTiendanubeAPI(brandKey, supabase);
         if (apiProds && apiProds.length > 0) {
             scraped = apiProds;
             metodoSync = 'api_tiendanube';
@@ -832,6 +889,11 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
                 const pVarNorm = normalizeName(p.variante || '');
 
                 if (sp.esVariante && varNorm && pVarNorm && pVarNorm !== 'unica' && pVarNorm !== varNorm) {
+                    return false;
+                }
+
+                // Si sp NO es variante (producto simple o base), no debe asociarse a una variante específica de color existente (ej. Rosa, Azul)
+                if (!sp.esVariante && pVarNorm && pVarNorm !== 'unica') {
                     return false;
                 }
 
@@ -1088,6 +1150,7 @@ async function guardarMetadataIncanto(supabase, metadata) {
 
 module.exports = {
     fetchProductosTiendanubeAPI,
+    guardarCredencialesTiendanube,
     scrapeTiendaProductos,
     scrapePanatechProductos,
     scrapeIncantoProductos,
