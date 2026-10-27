@@ -2762,7 +2762,9 @@ function mostrarFormularioNuevoUsuario() {
     document.getElementById('formUsuarioTitulo').textContent = 'Crear Nuevo Usuario';
     document.getElementById('usrUsername').value = '';
     document.getElementById('usrUsername').removeAttribute('readonly');
-    document.getElementById('usrPassword').value = '';
+    const inputPass = document.getElementById('usrPassword');
+    inputPass.value = '';
+    inputPass.placeholder = 'Contraseña de ingreso';
 
     // Marcar Panatech habilitado por defecto con menús básicos
     document.getElementById('usrHabilitadoPanatech').checked = true;
@@ -2825,7 +2827,9 @@ function editarUsuario(username) {
         inputUsr.removeAttribute('readonly');
     }
 
-    document.getElementById('usrPassword').value = u.password || '';
+    const inputPass = document.getElementById('usrPassword');
+    inputPass.value = '';
+    inputPass.placeholder = 'Dejar en blanco para mantener la actual';
 
     // Cargar Panatech
     const panaHab = !!(u.panatech && u.panatech.habilitado);
@@ -2855,8 +2859,13 @@ async function guardarUsuarioForm() {
     const username = document.getElementById('usrUsername').value.trim();
     const password = document.getElementById('usrPassword').value.trim();
 
-    if (!username || !password) {
-        showToast('El usuario y la contraseña son obligatorios.', 'warning');
+    if (!username) {
+        showToast('El nombre de usuario es obligatorio.', 'warning');
+        return;
+    }
+
+    if (!usuarioEnEdicion && !password) {
+        showToast('La contraseña es obligatoria para un usuario nuevo.', 'warning');
         return;
     }
 

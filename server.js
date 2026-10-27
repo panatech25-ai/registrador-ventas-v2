@@ -4,6 +4,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 // ── Zona Horaria GMT-3 (Argentina) ───────────────────────────────────────────
 const TIMEZONE_ARG = 'America/Argentina/Buenos_Aires';
@@ -105,11 +106,11 @@ const supabaseUrl = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim() :
 const supabaseKey = process.env.SUPABASE_KEY ? process.env.SUPABASE_KEY.trim() : '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Configuración por defecto de usuarios y permisos
+// Configuración por defecto de usuarios y permisos (Todas las contraseñas están hasheadas con bcrypt)
 const USUARIOS_DEFAULT = [
     {
         username: 'npanadisi',
-        password: 'Asdasdasd123!',
+        password: process.env.ADMIN_INITIAL_PASSWORD_HASH || '$2b$10$18JvyzbISXUVHknHYh5KwOsFvK77b57yhAOt8fBnE5FvhmH5aCeE2',
         panatech: {
             habilitado: true,
             permisos: { nueva_orden: true, busqueda: true, stock: true, informes: true }
@@ -121,7 +122,7 @@ const USUARIOS_DEFAULT = [
     },
     {
         username: 'bprimo',
-        password: 'Austra2706!',
+        password: '$2b$10$lpBX.ltBreNNO1s7Isa63eHi39egPTYMhNWX0KBV3Y3mEx3CIIFVC',
         panatech: {
             habilitado: true,
             permisos: { nueva_orden: true, busqueda: true, stock: true, informes: false }
@@ -133,26 +134,38 @@ const USUARIOS_DEFAULT = [
     },
     {
         username: 'mpanadisi',
-        password: 'Taxi1781!',
+        password: '$2b$10$b5./qo3Cl9JMYEdKBzwcPu6yS/NhxrgTpHZx/GtS/533vraimCf5G',
         panatech: {
             habilitado: true,
             permisos: { nueva_orden: true, busqueda: true, stock: true, informes: false }
         },
         incanto: {
             habilitado: false,
-            permisos: { nueva_orden: false, busqueda: false, stock: false, informes: false }
+            permisos: { nueva_orden: false, busqueda: false, stock: false, informes: false, mayorista: false }
         }
     },
     {
         username: 'jpanadisi',
-        password: 'Taxi1781!',
+        password: '$2b$10$ltTbOY1ont1UQ6lklXicTe5cE9giotPR6zInlAQzecz/AWYJzz2kC',
         panatech: {
             habilitado: true,
             permisos: { nueva_orden: true, busqueda: true, stock: true, informes: false }
         },
         incanto: {
             habilitado: false,
+            permisos: { nueva_orden: false, busqueda: false, stock: false, informes: false, mayorista: false }
+        }
+    },
+    {
+        username: 'rprimo',
+        password: '$2b$10$Y6.wL7H/5rwao0F9yS1kbeq2JFq5tIQOGCrKI5g6pyfJibwsI15/i',
+        panatech: {
+            habilitado: false,
             permisos: { nueva_orden: false, busqueda: false, stock: false, informes: false }
+        },
+        incanto: {
+            habilitado: true,
+            permisos: { nueva_orden: false, busqueda: false, stock: false, informes: false, mayorista: true }
         }
     }
 ];
@@ -182,6 +195,18 @@ async function obtenerUsuarios() {
         if (data && data.observaciones) {
             const parsed = JSON.parse(data.observaciones);
             if (Array.isArray(parsed) && parsed.length > 0) {
+                // Auto-migración defensiva: asegurar que toda contraseña quede hasheada
+                let requireReSave = false;
+                for (const u of parsed) {
+                    if (u.password && !u.password.startsWith('$2a$') && !u.password.startsWith('$2b$')) {
+                        u.password = bcrypt.hashSync(u.password, 10);
+                        requireReSave = true;
+                    }
+                }
+                if (requireReSave) {
+                    guardarUsuarios(parsed).catch(err => console.error('Error auto-migrando contraseñas:', err));
+                }
+
                 usuariosCache = parsed;
                 ultimaCargaUsuarios = ahora;
                 return usuariosCache;
@@ -348,7 +373,20 @@ app.post('/login/:marca', async (req, res) => {
         const usuarios = await obtenerUsuarios();
         const usuarioEncontrado = usuarios.find(u => (u.username || '').toLowerCase() === userTarget);
 
-        if (usuarioEncontrado && usuarioEncontrado.password === password) {
+        let passwordValido = false;
+        if (usuarioEncontrado && usuarioEncontrado.password) {
+            if (usuarioEncontrado.password.startsWith('$2a$') || usuarioEncontrado.password.startsWith('$2b$')) {
+                passwordValido = bcrypt.compareSync(password, usuarioEncontrado.password);
+            } else {
+                passwordValido = (usuarioEncontrado.password === password);
+                if (passwordValido) {
+                    usuarioEncontrado.password = bcrypt.hashSync(password, 10);
+                    guardarUsuarios(usuarios).catch(() => {});
+                }
+            }
+        }
+
+        if (passwordValido) {
             const configMarca = usuarioEncontrado[marca];
             if (configMarca && configMarca.habilitado) {
                 // ── Generar JWT con datos del usuario ──────────────────────
@@ -1915,7 +1953,15 @@ app.get('/api/permisos/mis-permisos', autenticar, async (req, res) => {
 app.get('/api/usuarios', autenticarAdmin, async (req, res) => {
     try {
         const usuarios = await obtenerUsuarios();
-        res.json(usuarios);
+        // Ocultar contraseñas y hashes de la respuesta de la API
+        const sanitizados = usuarios.map(u => ({
+            username: u.username,
+            password: '', // nunca exponer el hash
+            tienePassword: !!u.password,
+            panatech: u.panatech,
+            incanto: u.incanto
+        }));
+        res.json(sanitizados);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1925,8 +1971,8 @@ app.get('/api/usuarios', autenticarAdmin, async (req, res) => {
 app.post('/api/usuarios', autenticarAdmin, async (req, res) => {
     const { usuario } = req.body;
 
-    if (!usuario || !usuario.username || !usuario.password) {
-        return res.status(400).json({ error: 'El nombre de usuario y la contraseña son obligatorios.' });
+    if (!usuario || !usuario.username) {
+        return res.status(400).json({ error: 'El nombre de usuario es obligatorio.' });
     }
 
     try {
@@ -1935,9 +1981,20 @@ app.post('/api/usuarios', autenticarAdmin, async (req, res) => {
         
         const idx = usuarios.findIndex(u => (u.username || '').toLowerCase() === usernameNormalizado);
 
+        let passwordHashFinal = '';
+        if (usuario.password && usuario.password.trim() !== '') {
+            // Se ingresó una nueva contraseña: la hasheamos con bcrypt
+            passwordHashFinal = bcrypt.hashSync(usuario.password.trim(), 10);
+        } else if (idx >= 0 && usuarios[idx].password) {
+            // Editando usuario existente sin cambiar contraseña: se mantiene el hash actual
+            passwordHashFinal = usuarios[idx].password;
+        } else {
+            return res.status(400).json({ error: 'La contraseña es obligatoria para nuevos usuarios.' });
+        }
+
         const usuarioAguardar = {
             username: usuario.username.trim(),
-            password: usuario.password.trim(),
+            password: passwordHashFinal,
             panatech: {
                 habilitado: !!(usuario.panatech && usuario.panatech.habilitado),
                 permisos: {
@@ -1968,7 +2025,14 @@ app.post('/api/usuarios', autenticarAdmin, async (req, res) => {
         const ok = await guardarUsuarios(usuarios);
         if (!ok) throw new Error('Error al guardar en base de datos');
 
-        res.json({ success: true, usuario: usuarioAguardar });
+        res.json({
+            success: true,
+            usuario: {
+                ...usuarioAguardar,
+                password: '',
+                tienePassword: true
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
