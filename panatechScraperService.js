@@ -11,7 +11,10 @@ const BRAND_CONFIGS = {
         sysConfigOrderNum: 'SYS_CONFIG_PRODUCTOS_METADATA_PANATECH',
         sysConfigClientName: 'Metadata Productos Panatech',
         localCacheFile: path.join(__dirname, 'panatech_metadata_cache.json'),
-        maxPages: 12
+        maxPages: 12,
+        storeIdEnv: 'TIENDANUBE_PANATECH_STORE_ID',
+        accessTokenEnv: 'TIENDANUBE_PANATECH_ACCESS_TOKEN',
+        descuentoEfectivoRatio: 0.85
     },
     incanto: {
         marca: 'incanto',
@@ -20,7 +23,10 @@ const BRAND_CONFIGS = {
         sysConfigOrderNum: 'SYS_CONFIG_PRODUCTOS_METADATA_INCANTO',
         sysConfigClientName: 'Metadata Productos Incanto',
         localCacheFile: path.join(__dirname, 'incanto_metadata_cache.json'),
-        maxPages: 25
+        maxPages: 25,
+        storeIdEnv: 'TIENDANUBE_INCANTO_STORE_ID',
+        accessTokenEnv: 'TIENDANUBE_INCANTO_ACCESS_TOKEN',
+        descuentoEfectivoRatio: 0.85
     }
 };
 
@@ -419,6 +425,162 @@ async function scrapeTiendaProductos(marca = 'panatech') {
     return expandedProducts;
 }
 
+// ── Convierte productos y variantes de la API oficial de Tiendanube al esquema unificado ──
+function expandApiProducts(rawProducts, descuentoRatio = 0.85) {
+    const expanded = [];
+
+    for (const p of rawProducts) {
+        const productId = String(p.id);
+        const name = p.name ? (p.name.es || Object.values(p.name)[0] || '') : '';
+        const url = p.canonical_url || '';
+
+        const imgMap = new Map();
+        (p.images || []).forEach(img => {
+            if (img && img.id && img.src) {
+                imgMap.set(img.id, img.src.startsWith('//') ? 'https:' + img.src : img.src);
+            }
+        });
+        const defaultImg = (p.images && p.images[0] && p.images[0].src)
+            ? (p.images[0].src.startsWith('//') ? 'https:' + p.images[0].src : p.images[0].src)
+            : '/img/no-image.svg';
+
+        const variants = Array.isArray(p.variants) ? p.variants : [];
+
+        if (variants.length > 1) {
+            for (const v of variants) {
+                const varName = (v.values && v.values.length > 0)
+                    ? v.values.map(val => val.es || Object.values(val)[0]).filter(Boolean).join(' / ')
+                    : 'Única';
+                const varImg = (v.image_id && imgMap.get(v.image_id)) || defaultImg;
+
+                let varStock = 0;
+                if (v.stock !== null && v.stock !== undefined) {
+                    varStock = parseInt(v.stock, 10) || 0;
+                } else if (v.available) {
+                    varStock = 1;
+                }
+
+                const precioLista = parseFloat(v.price) || 0;
+                let precioEfectivo = v.promotional_price
+                    ? parseFloat(v.promotional_price)
+                    : Math.round(precioLista * descuentoRatio * 100) / 100;
+
+                expanded.push({
+                    productId,
+                    variantId: v.id,
+                    name,
+                    variantName: varName,
+                    image: varImg,
+                    url,
+                    precioLista,
+                    precioEfectivo,
+                    stock: varStock,
+                    sku: v.sku || null,
+                    esVariante: true
+                });
+            }
+        } else {
+            const v0 = variants[0] || {};
+            const precioLista = parseFloat(v0.price) || 0;
+            const precioEfectivo = v0.promotional_price
+                ? parseFloat(v0.promotional_price)
+                : Math.round(precioLista * descuentoRatio * 100) / 100;
+
+            let stock = 0;
+            if (v0.stock !== null && v0.stock !== undefined) {
+                stock = parseInt(v0.stock, 10) || 0;
+            } else if (v0.available) {
+                stock = 1;
+            }
+
+            expanded.push({
+                productId,
+                variantId: v0.id || null,
+                name,
+                variantName: 'Única',
+                image: defaultImg,
+                url,
+                precioLista,
+                precioEfectivo,
+                stock,
+                sku: v0.sku || null,
+                esVariante: false
+            });
+        }
+    }
+
+    return expanded;
+}
+
+// ── Consulta catálogo completo mediante la API REST oficial de Tiendanube ──
+function fetchProductosTiendanubeAPI(brandKey) {
+    const config = BRAND_CONFIGS[brandKey];
+    if (!config) return Promise.resolve(null);
+
+    const storeId = process.env[config.storeIdEnv];
+    const accessToken = process.env[config.accessTokenEnv];
+
+    if (!storeId || !accessToken) {
+        return Promise.resolve(null);
+    }
+
+    const descuentoRatio = config.descuentoEfectivoRatio || 0.85;
+
+    return new Promise((resolve, reject) => {
+        let allRawProducts = [];
+        let page = 1;
+
+        function fetchNextPage() {
+            const options = {
+                hostname: 'api.tiendanube.com',
+                port: 443,
+                path: `/v1/${storeId}/products?per_page=200&page=${page}`,
+                method: 'GET',
+                headers: {
+                    'Authentication': `bearer ${accessToken}`,
+                    'User-Agent': `RegistradorVentas (${storeId}@tiendanube.com)`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 15000
+            };
+
+            const req = https.request(options, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    if (res.statusCode !== 200) {
+                        return reject(new Error(`Tiendanube API HTTP ${res.statusCode}: ${data.substring(0, 200)}`));
+                    }
+                    try {
+                        const prods = JSON.parse(data);
+                        if (!Array.isArray(prods) || prods.length === 0) {
+                            return resolve(expandApiProducts(allRawProducts, descuentoRatio));
+                        }
+                        allRawProducts = allRawProducts.concat(prods);
+                        if (prods.length < 200) {
+                            return resolve(expandApiProducts(allRawProducts, descuentoRatio));
+                        }
+                        page++;
+                        fetchNextPage();
+                    } catch (e) {
+                        reject(new Error(`Error al parsear respuesta JSON de Tiendanube API: ${e.message}`));
+                    }
+                });
+            });
+
+            req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('Timeout al consultar Tiendanube API'));
+            });
+
+            req.on('error', reject);
+            req.end();
+        }
+
+        fetchNextPage();
+    });
+}
+
 // Helper para obtener todos los productos de una marca en Supabase superando el límite de 1000 filas
 async function fetchAllDbProductsByBrand(supabase, marcaTarget) {
     const allRows = [];
@@ -553,10 +715,28 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
     }
 
     const inicio = Date.now();
-    console.log(`[Scraper ${brandKey.toUpperCase()}] Iniciando sincronización completa...`);
+    console.log(`[Sync ${brandKey.toUpperCase()}] Iniciando sincronización completa...`);
 
-    // 1. Scrapear la tienda online
-    const scraped = await scrapeTiendaProductos(brandKey);
+    // 1. Obtener productos de la tienda (vía API oficial de Tiendanube si hay credenciales, o fallback a scraper web)
+    let scraped = null;
+    let metodoSync = 'web_scraper';
+
+    try {
+        const apiProds = await fetchProductosTiendanubeAPI(brandKey);
+        if (apiProds && apiProds.length > 0) {
+            scraped = apiProds;
+            metodoSync = 'api_tiendanube';
+            console.log(`[Sync ${brandKey.toUpperCase()}] Obtenidos ${scraped.length} productos/variantes vía API oficial de Tiendanube`);
+        }
+    } catch (apiErr) {
+        console.warn(`[Sync ${brandKey.toUpperCase()}] Error al consultar API de Tiendanube (${apiErr.message}). Intentando scraper web...`);
+    }
+
+    if (!scraped) {
+        console.log(`[Sync ${brandKey.toUpperCase()}] Consultando productos vía scraper web...`);
+        scraped = await scrapeTiendaProductos(brandKey);
+    }
+
     if (!scraped || scraped.length === 0) {
         throw new Error(`No se pudieron obtener productos de la tienda online (${config.baseUrl})`);
     }
@@ -740,7 +920,7 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
         } else {
             // Producto o variante NUEVA en el sistema: preparar para insertar
             const varSuffix = sp.variantId ? `-${String(sp.variantId).slice(-4)}` : (sp.variantName && sp.variantName !== 'Única' ? `-${normalizeName(sp.variantName).slice(0, 3)}` : '');
-            const nuevoSku = `${config.skuPrefix}${sp.productId.slice(-6)}${varSuffix}`;
+            const nuevoSku = (sp.sku && sp.sku.trim()) ? sp.sku.trim() : `${config.skuPrefix}${sp.productId.slice(-6)}${varSuffix}`;
             toInsert.push({
                 sp,
                 sNorm,
@@ -846,6 +1026,7 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
     // Guardar resumen general en metadata
     metadata._info = {
         ultima_sincronizacion: new Date().toISOString(),
+        metodo_sync: metodoSync,
         total_web: scraped.length,
         actualizados,
         nuevos,
@@ -856,11 +1037,12 @@ async function sincronizarProductosMarca(supabase, marca = 'panatech') {
 
     await guardarMetadataMarca(supabase, metadata, brandKey);
 
-    console.log(`[Scraper ${brandKey.toUpperCase()}] Sincronización finalizada en ${Date.now() - inicio}ms:`, metadata._info);
+    console.log(`[Sync ${brandKey.toUpperCase()}] Sincronización finalizada en ${Date.now() - inicio}ms (${metodoSync}):`, metadata._info);
 
     return {
         success: true,
         marca: brandKey,
+        metodoSync,
         totalWeb: scraped.length,
         actualizados,
         nuevos,
@@ -905,6 +1087,7 @@ async function guardarMetadataIncanto(supabase, metadata) {
 }
 
 module.exports = {
+    fetchProductosTiendanubeAPI,
     scrapeTiendaProductos,
     scrapePanatechProductos,
     scrapeIncantoProductos,
