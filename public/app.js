@@ -4,7 +4,8 @@ if (!params.get('marca')) {
     window.location.href = '/';
 }
 let MARCA_ACTUAL = (params.get('marca') || '').toLowerCase();
-let USUARIO_ACTUAL = params.get('usuario') || 'vendedor';
+// USUARIO_ACTUAL se carga desde el JWT via /api/me (no desde la URL)
+let USUARIO_ACTUAL = 'cargando...';
 let ultimasOrdenesMemoria = [];
 let html5QrCodeScanner = null;
 let ultimaOrdenGuardada = null;
@@ -12,7 +13,30 @@ let ultimaOrdenGuardada = null;
 // ==========================================
 // INICIALIZACIÓN
 // ==========================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Primero verificar sesión JWT — redirigir al login si no hay token válido
+    try {
+        const meRes = await fetch('/api/me');
+        if (!meRes.ok) {
+            // Sin sesión válida → redirigir al login de la marca
+            window.location.href = `/login/${MARCA_ACTUAL}`;
+            return;
+        }
+        const meData = await meRes.json();
+        USUARIO_ACTUAL = meData.username || 'vendedor';
+        ES_ADMIN = !!meData.esAdmin;
+        PERMISOS_ACTUALES = meData.permisos || {};
+
+        // Si el JWT es de otra marca, redirigir al login correcto
+        if (meData.marca && meData.marca !== MARCA_ACTUAL) {
+            window.location.href = `/login/${MARCA_ACTUAL}`;
+            return;
+        }
+    } catch (err) {
+        window.location.href = `/login/${MARCA_ACTUAL}`;
+        return;
+    }
+
     configurarMarcaUI();
     document.getElementById('fecha').valueAsDate = new Date();
     document.getElementById('vendedor').value = USUARIO_ACTUAL;
@@ -125,15 +149,14 @@ async function configurarMarcaUI() {
 }
 
 async function cargarPermisosUsuario() {
-    const user = (USUARIO_ACTUAL || '').toLowerCase().trim();
-    ES_ADMIN = (user === 'npanadisi');
-
     try {
-        const res = await fetch(`/api/permisos/mis-permisos?usuario=${encodeURIComponent(USUARIO_ACTUAL)}&marca=${MARCA_ACTUAL}`);
+        // Los permisos vienen del JWT — el backend los devuelve sin necesitar ?usuario=
+        const res = await fetch(`/api/permisos/mis-permisos`);
         if (res.ok) {
             const data = await res.json();
             PERMISOS_ACTUALES = data.permisos || {};
             ES_ADMIN = !!data.esAdmin;
+            USUARIO_ACTUAL = data.username || USUARIO_ACTUAL;
         } else if (ES_ADMIN) {
             PERMISOS_ACTUALES = { nueva_orden: true, busqueda: true, stock: true, informes: true };
         }
@@ -145,6 +168,18 @@ async function cargarPermisosUsuario() {
     }
 
     aplicarPermisosEnUI();
+
+    // Mostrar nombre de usuario en el sidebar
+    const labelUsuario = document.getElementById('sideNavUsuarioLabel');
+    if (labelUsuario) labelUsuario.textContent = USUARIO_ACTUAL;
+}
+
+// ── Cerrar sesión ────────────────────────────────────────────────────────────
+async function cerrarSesion() {
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+    } catch (_) {}
+    window.location.href = `/login/${MARCA_ACTUAL}`;
 }
 
 function aplicarPermisosEnUI() {
@@ -2624,7 +2659,7 @@ async function cargarListaUsuarios() {
     container.innerHTML = '<p class="text-xs text-slate-400 italic p-3 text-center">Cargando lista de usuarios...</p>';
 
     try {
-        const res = await fetch(`/api/usuarios?usuario_solicitante=${encodeURIComponent(USUARIO_ACTUAL)}`);
+        const res = await fetch(`/api/usuarios`);
         if (!res.ok) throw new Error('No se pudo cargar la lista');
 
         const usuarios = await res.json();
@@ -2808,7 +2843,6 @@ async function guardarUsuarioForm() {
     }
 
     const payload = {
-        usuario_solicitante: USUARIO_ACTUAL,
         usuario: {
             username,
             password,
@@ -2864,7 +2898,7 @@ async function eliminarUsuario(username) {
     }
 
     try {
-        const res = await fetch(`/api/usuarios/${encodeURIComponent(username)}?usuario_solicitante=${encodeURIComponent(USUARIO_ACTUAL)}`, {
+        const res = await fetch(`/api/usuarios/${encodeURIComponent(username)}`, {
             method: 'DELETE'
         });
 

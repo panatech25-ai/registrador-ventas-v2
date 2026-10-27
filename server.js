@@ -2,6 +2,49 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_cambiar_en_produccion';
+const JWT_EXPIRES_IN = '8h'; // La sesión dura 8 horas
+
+// ── Middleware de autenticación JWT ──────────────────────────────────────────
+// Lee el token desde la cookie 'token' o del header Authorization: Bearer <tok>
+// Si el token es válido, expone req.usuarioJWT = { username, marca, esAdmin }
+function autenticar(req, res, next) {
+    let token = null;
+
+    // Prioridad 1: cookie HttpOnly (flujo normal de la app)
+    if (req.headers.cookie) {
+        const match = req.headers.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+        if (match) token = match[1];
+    }
+
+    // Prioridad 2: header Authorization: Bearer <token> (APIs externas / debug)
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+        token = req.headers.authorization.slice(7);
+    }
+
+    if (!token) {
+        return res.status(401).json({ error: 'No autenticado. Por favor iniciá sesión.' });
+    }
+
+    try {
+        req.usuarioJWT = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch (err) {
+        return res.status(403).json({ error: 'Sesión inválida o expirada. Por favor iniciá sesión nuevamente.' });
+    }
+}
+
+// Variante de autenticar que además verifica que sea admin
+function autenticarAdmin(req, res, next) {
+    autenticar(req, res, () => {
+        if (!req.usuarioJWT.esAdmin) {
+            return res.status(403).json({ error: 'Acción reservada al administrador.' });
+        }
+        next();
+    });
+}
 const {
     generarReporteVentasAvanzado,
     exportarCatalogoStockExcel,
@@ -278,16 +321,34 @@ app.post('/login/:marca', async (req, res) => {
     const marca = req.params.marca.toLowerCase();
     const { usuario, password } = req.body;
     const userTarget = (usuario || '').trim().toLowerCase();
-    
+
     try {
         const usuarios = await obtenerUsuarios();
         const usuarioEncontrado = usuarios.find(u => (u.username || '').toLowerCase() === userTarget);
 
         if (usuarioEncontrado && usuarioEncontrado.password === password) {
-            // Verificar si el usuario está habilitado para esta marca
             const configMarca = usuarioEncontrado[marca];
             if (configMarca && configMarca.habilitado) {
-                return res.redirect(`/app.html?marca=${marca}&usuario=${encodeURIComponent(usuarioEncontrado.username)}`);
+                // ── Generar JWT con datos del usuario ──────────────────────
+                const esAdmin = userTarget === 'npanadisi';
+                const payload = {
+                    username: usuarioEncontrado.username,
+                    marca,
+                    esAdmin,
+                    permisos: configMarca.permisos || {}
+                };
+                const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+                // Cookie HttpOnly: el JS del frontend NO puede leerla/robarla
+                res.cookie('token', token, {
+                    httpOnly: true,
+                    sameSite: 'Lax',
+                    maxAge: 8 * 60 * 60 * 1000, // 8 horas en ms
+                    // secure: true  ← descomentar cuando el sitio use HTTPS
+                });
+
+                // Ya no exponemos el usuario en la URL
+                return res.redirect(`/app.html?marca=${marca}`);
             } else {
                 return renderLogin(res, marca, `No tenés permisos para ingresar al emprendimiento ${marca.toUpperCase()}`);
             }
@@ -297,6 +358,17 @@ app.post('/login/:marca', async (req, res) => {
     } catch (err) {
         renderLogin(res, marca, 'Error al procesar el inicio de sesión');
     }
+});
+
+// ── Endpoint: datos del usuario actual (leídos desde el JWT de la cookie) ────
+app.get('/api/me', autenticar, (req, res) => {
+    res.json(req.usuarioJWT);
+});
+
+// ── Endpoint: cerrar sesión ───────────────────────────────────────────────────
+app.post('/api/logout', (req, res) => {
+    res.clearCookie('token', { httpOnly: true, sameSite: 'Lax' });
+    res.json({ success: true });
 });
 
 // API Métricas de Hoy (Mini-Dashboard)
@@ -1805,41 +1877,20 @@ app.get('/reporte-mayorista', async (req, res) => {
 // ==========================================
 
 // Obtener permisos del usuario logueado para la marca actual
-app.get('/api/permisos/mis-permisos', async (req, res) => {
-    const { usuario, marca } = req.query;
-    const userTarget = (usuario || '').toLowerCase().trim();
-    const marcaTarget = (marca || 'panatech').toLowerCase().trim();
-
-    try {
-        const usuarios = await obtenerUsuarios();
-        const u = usuarios.find(x => (x.username || '').toLowerCase() === userTarget);
-
-        if (!u) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-        }
-
-        const configMarca = u[marcaTarget] || { habilitado: false, permisos: {} };
-        const esAdmin = userTarget === 'npanadisi';
-
-        res.json({
-            username: u.username,
-            marca: marcaTarget,
-            habilitado: configMarca.habilitado,
-            permisos: configMarca.permisos || {},
-            esAdmin
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+// Ahora lee los datos desde el JWT, no desde el query param
+app.get('/api/permisos/mis-permisos', autenticar, async (req, res) => {
+    // req.usuarioJWT ya tiene username, marca, permisos, esAdmin
+    res.json({
+        username: req.usuarioJWT.username,
+        marca:    req.usuarioJWT.marca,
+        habilitado: true, // si llegó hasta acá con JWT válido, está habilitado
+        permisos: req.usuarioJWT.permisos || {},
+        esAdmin:  req.usuarioJWT.esAdmin || false
+    });
 });
 
-// Listar todos los usuarios (Solo npanadisi)
-app.get('/api/usuarios', async (req, res) => {
-    const { usuario_solicitante } = req.query;
-    if ((usuario_solicitante || '').toLowerCase().trim() !== 'npanadisi') {
-        return res.status(403).json({ error: 'Solo el administrador npanadisi puede gestionar usuarios.' });
-    }
-
+// Listar todos los usuarios (Solo admin)
+app.get('/api/usuarios', autenticarAdmin, async (req, res) => {
     try {
         const usuarios = await obtenerUsuarios();
         res.json(usuarios);
@@ -1848,12 +1899,9 @@ app.get('/api/usuarios', async (req, res) => {
     }
 });
 
-// Guardar / Crear / Modificar usuario (Solo npanadisi)
-app.post('/api/usuarios', async (req, res) => {
-    const { usuario_solicitante, usuario } = req.body;
-    if ((usuario_solicitante || '').toLowerCase().trim() !== 'npanadisi') {
-        return res.status(403).json({ error: 'Solo el administrador npanadisi puede gestionar usuarios.' });
-    }
+// Guardar / Crear / Modificar usuario (Solo admin)
+app.post('/api/usuarios', autenticarAdmin, async (req, res) => {
+    const { usuario } = req.body;
 
     if (!usuario || !usuario.username || !usuario.password) {
         return res.status(400).json({ error: 'El nombre de usuario y la contraseña son obligatorios.' });
@@ -1904,14 +1952,9 @@ app.post('/api/usuarios', async (req, res) => {
     }
 });
 
-// Eliminar usuario (Solo npanadisi)
-app.delete('/api/usuarios/:username', async (req, res) => {
-    const { usuario_solicitante } = req.query;
+// Eliminar usuario (Solo admin)
+app.delete('/api/usuarios/:username', autenticarAdmin, async (req, res) => {
     const { username } = req.params;
-
-    if ((usuario_solicitante || '').toLowerCase().trim() !== 'npanadisi') {
-        return res.status(403).json({ error: 'Solo el administrador npanadisi puede gestionar usuarios.' });
-    }
 
     if ((username || '').toLowerCase().trim() === 'npanadisi') {
         return res.status(400).json({ error: 'No es posible eliminar al usuario administrador npanadisi.' });
