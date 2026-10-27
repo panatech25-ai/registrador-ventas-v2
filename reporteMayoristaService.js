@@ -99,7 +99,7 @@ function generarHTMLReporteMayorista({ transacciones = [], productos = [], cotiz
         periodoTexto = `Hasta ${formatearFecha(hasta)}`;
     }
 
-    const fechaHoyStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fechaHoyStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: 'short', year: 'numeric' });
 
     return `<!DOCTYPE html>
 <html lang="es">

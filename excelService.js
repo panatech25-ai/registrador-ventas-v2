@@ -177,7 +177,8 @@ async function generarReporteVentasAvanzado(ordenes = [], marca = 'panatech', de
     // Subtítulo con período
     wsDashboard.mergeCells('B3:G3');
     const subTitle = wsDashboard.getCell('B3');
-    subTitle.value = `Período analizado: ${desde || 'Inicio'} al ${hasta || 'Hoy'}  |  Generado: ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR')}`;
+    const fechaHoraGenerado = `${new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })} ${new Date().toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}`;
+    subTitle.value = `Período analizado: ${desde || 'Inicio'} al ${hasta || 'Hoy'}  |  Generado: ${fechaHoraGenerado} (GMT-3)`;
     subTitle.font = { italic: true, size: 10, color: { argb: 'FFFFFF' } };
     subTitle.alignment = { horizontal: 'center', vertical: 'middle' };
     subTitle.fill = {

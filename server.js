@@ -1,8 +1,30 @@
 require('dotenv').config();
+process.env.TZ = 'America/Argentina/Buenos_Aires';
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+
+// ── Zona Horaria GMT-3 (Argentina) ───────────────────────────────────────────
+const TIMEZONE_ARG = 'America/Argentina/Buenos_Aires';
+
+function getFechaLocalHoy() {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: TIMEZONE_ARG,
+        year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+}
+
+function getPrimerDiaMesLocal() {
+    const ahora = new Date();
+    const partes = new Intl.DateTimeFormat('es-AR', {
+        timeZone: TIMEZONE_ARG,
+        year: 'numeric', month: '2-digit'
+    }).formatToParts(ahora);
+    const year = partes.find(p => p.type === 'year').value;
+    const month = partes.find(p => p.type === 'month').value;
+    return `${year}-${month}-01`;
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_cambiar_en_produccion';
 const JWT_EXPIRES_IN = '8h'; // La sesión dura 8 horas
@@ -377,8 +399,8 @@ app.get('/api/metricas/hoy', async (req, res) => {
     const marcaTarget = (marca || 'panatech').toLowerCase();
     const prefijo = marcaTarget === 'incanto' ? '#INC' : '#PAN';
 
-    // Fecha actual en hora local / ISO string YYYY-MM-DD
-    const hoyStr = new Date().toISOString().split('T')[0];
+    // Fecha actual en hora local GMT-3 (Argentina)
+    const hoyStr = getFechaLocalHoy();
 
     try {
         const { data: ordenesHoy, error } = await supabase
@@ -572,7 +594,7 @@ app.get('/api/productos/exportar-excel', async (req, res) => {
         });
 
         const workbook = await exportarCatalogoStockExcel(productosEnriquecidos, marcaTarget);
-        const fechaStr = new Date().toISOString().slice(0, 10);
+        const fechaStr = getFechaLocalHoy();
         const filename = `Stock_${marcaTarget.toUpperCase()}_${fechaStr}.xlsx`;
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -901,11 +923,12 @@ app.post('/api/ordenes', async (req, res) => {
 
         const numero_orden = `${prefijo}-${1000 + (count || 0) + 1}`;
         const obsFinal = procesarObservacionesParaGuardar(observaciones, pago_envio);
+        const fechaOrden = fecha || getFechaLocalHoy();
 
         const { data: orden, error: errOrden } = await supabase
             .from('ordenes')
             .insert([{
-                numero_orden, fecha, vendedor, cliente_nombre, cliente_telefono, observaciones: obsFinal, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Sin especificar'
+                numero_orden, fecha: fechaOrden, vendedor, cliente_nombre, cliente_telefono, observaciones: obsFinal, modo_entrega, cadete, direccion_envio, costo_envio: costo_envio || 0, horario_envio, total, estado: estado || 'Iniciado', metodo_pago: metodo_pago || 'Sin especificar'
             }])
             .select()
             .single();
@@ -1139,8 +1162,7 @@ app.get('/api/dolar/mep', async (req, res) => {
 // 3. Valor estimado total en $ (suma de precio * stock)
 app.get('/api/mayorista/metricas', async (req, res) => {
     try {
-        const hoy = new Date();
-        const inicioMesStr = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+        const inicioMesStr = getPrimerDiaMesLocal();
 
         // 1. Ventas del mes: órdenes con prefijo #INC-MAY-VTA-
         const { data: ventasMes, error: errVentas } = await supabase
@@ -1606,7 +1628,7 @@ app.post('/api/mayorista/ventas', async (req, res) => {
         }
 
         const numVenta = `#INC-MAY-VTA-${Date.now().toString().slice(-6)}`;
-        const fechaHoy = new Date().toISOString().split('T')[0];
+        const fechaHoy = getFechaLocalHoy();
 
         const detalleObj = {
             tipo: 'venta_mayorista',
@@ -1676,7 +1698,7 @@ app.post('/api/mayorista/compras', async (req, res) => {
         }
 
         const numCompra = `#INC-MAY-CMP-${Date.now().toString().slice(-6)}`;
-        const fechaHoy = new Date().toISOString().split('T')[0];
+        const fechaHoy = getFechaLocalHoy();
 
         const detalleObj = {
             tipo: 'compra_mayorista',

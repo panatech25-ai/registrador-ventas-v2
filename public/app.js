@@ -11,6 +11,32 @@ let html5QrCodeScanner = null;
 let ultimaOrdenGuardada = null;
 
 // ==========================================
+// CONFIGURACIÓN DE FECHA Y HORA (GMT-3 ARGENTINA)
+// ==========================================
+const TIMEZONE_ARG = 'America/Argentina/Buenos_Aires';
+
+function getFechaLocalHoy() {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: TIMEZONE_ARG,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date());
+}
+
+function getPrimerDiaMesLocal() {
+    const ahora = new Date();
+    const partes = new Intl.DateTimeFormat('es-AR', {
+        timeZone: TIMEZONE_ARG,
+        year: 'numeric',
+        month: '2-digit'
+    }).formatToParts(ahora);
+    const year = partes.find(p => p.type === 'year').value;
+    const month = partes.find(p => p.type === 'month').value;
+    return `${year}-${month}-01`;
+}
+
+// ==========================================
 // INICIALIZACIÓN
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -38,15 +64,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     configurarMarcaUI();
-    document.getElementById('fecha').valueAsDate = new Date();
+    document.getElementById('fecha').value = getFechaLocalHoy();
     document.getElementById('vendedor').value = USUARIO_ACTUAL;
     cargarUltimasOrdenes();
     cargarMetricasHoy();
     actualizarColorEstado('Iniciado');
 
-    // Inicializar fechas por defecto del modal de exportación
-    const hoyStr = new Date().toISOString().split('T')[0];
-    const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    // Inicializar fechas por defecto del modal de exportación (GMT-3)
+    const hoyStr = getFechaLocalHoy();
+    const primerDiaMes = getPrimerDiaMesLocal();
     if (document.getElementById('exportFechaInicio')) document.getElementById('exportFechaInicio').value = primerDiaMes;
     if (document.getElementById('exportFechaFin')) document.getElementById('exportFechaFin').value = hoyStr;
 });
@@ -1165,7 +1191,7 @@ async function buscarOrdenDirecto(num) {
 function limpiarFormulario() {
     document.getElementById('ordenForm').reset();
     document.getElementById('ordenId').value = '';
-    document.getElementById('fecha').valueAsDate = new Date();
+    document.getElementById('fecha').value = getFechaLocalHoy();
     document.getElementById('vendedor').value = USUARIO_ACTUAL;
     document.getElementById('observaciones').value = '';
     document.getElementById('estado_pedido').value = 'Iniciado';
@@ -1209,7 +1235,7 @@ function cerrarModalExportar() {
 }
 
 function setPresetExport(tipo) {
-    const hoyStr = new Date().toISOString().split('T')[0];
+    const hoyStr = getFechaLocalHoy();
     const inputInicio = document.getElementById('exportFechaInicio');
     const inputFin = document.getElementById('exportFechaFin');
 
@@ -1217,7 +1243,7 @@ function setPresetExport(tipo) {
         inputInicio.value = hoyStr;
         inputFin.value = hoyStr;
     } else if (tipo === 'mes') {
-        const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        const primerDiaMes = getPrimerDiaMesLocal();
         inputInicio.value = primerDiaMes;
         inputFin.value = hoyStr;
     } else if (tipo === 'todo') {
@@ -1391,7 +1417,7 @@ async function cargarCatalogoProductos() {
             if (infoSync) {
                 if ((MARCA_ACTUAL === 'panatech' || MARCA_ACTUAL === 'incanto') && data.syncInfo && data.syncInfo.ultima_sincronizacion) {
                     const fecha = new Date(data.syncInfo.ultima_sincronizacion);
-                    const fechaTxt = fecha.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+                    const fechaTxt = fecha.toLocaleString('es-AR', { timeZone: TIMEZONE_ARG, dateStyle: 'short', timeStyle: 'short' });
                     const colorMarca = MARCA_ACTUAL === 'panatech' ? 'text-sky-400' : 'text-rose-400';
                     infoSync.innerHTML = `Última sincronización web: <span class="${colorMarca} font-semibold">${fechaTxt}</span> (${data.syncInfo.total_web || 0} en tienda)`;
                 } else {
@@ -3773,9 +3799,9 @@ function abrirModalReporteMayorista() {
     const modal = document.getElementById('modalExportarMayorista');
     if (!modal) return;
     
-    // Inicializar fechas por defecto (este mes)
-    const hoyStr = new Date().toISOString().split('T')[0];
-    const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    // Inicializar fechas por defecto (este mes en GMT-3)
+    const hoyStr = getFechaLocalHoy();
+    const primerDiaMes = getPrimerDiaMesLocal();
     const inputInicio = document.getElementById('exportMayFechaInicio');
     const inputFin = document.getElementById('exportMayFechaFin');
     if (inputInicio && !inputInicio.value) inputInicio.value = primerDiaMes;
@@ -3790,7 +3816,7 @@ function cerrarModalReporteMayorista() {
 }
 
 function setPresetExportMayorista(tipo) {
-    const hoyStr = new Date().toISOString().split('T')[0];
+    const hoyStr = getFechaLocalHoy();
     const inputInicio = document.getElementById('exportMayFechaInicio');
     const inputFin = document.getElementById('exportMayFechaFin');
     if (!inputInicio || !inputFin) return;
@@ -3799,7 +3825,7 @@ function setPresetExportMayorista(tipo) {
         inputInicio.value = hoyStr;
         inputFin.value = hoyStr;
     } else if (tipo === 'mes') {
-        const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        const primerDiaMes = getPrimerDiaMesLocal();
         inputInicio.value = primerDiaMes;
         inputFin.value = hoyStr;
     } else if (tipo === 'todo') {

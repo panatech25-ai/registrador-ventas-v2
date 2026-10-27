@@ -170,7 +170,7 @@ function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', h
         periodoTexto = `Hasta ${formatearFecha(hasta)}`;
     }
 
-    const fechaHoyStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fechaHoyStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: 'short', year: 'numeric' });
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -584,21 +584,35 @@ function generarHTMLPresentacion(ordenes = [], marca = 'panatech', desde = '', h
             }
         }
 
+        function getFechaLocalHoy() {
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Argentina/Buenos_Aires',
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            }).format(new Date());
+        }
+
         function aplicarPresetFecha(tipo) {
-            const hoy = new Date();
-            const hoyStr = hoy.toISOString().split('T')[0];
+            const hoyStr = getFechaLocalHoy();
             let desde = '';
             let hasta = hoyStr;
 
             if (tipo === 'hoy') {
                 desde = hoyStr;
             } else if (tipo === '7dias') {
-                const hace7 = new Date();
-                hace7.setDate(hoy.getDate() - 7);
-                desde = hace7.toISOString().split('T')[0];
+                const hace7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                desde = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'America/Argentina/Buenos_Aires',
+                    year: 'numeric', month: '2-digit', day: '2-digit'
+                }).format(hace7);
             } else if (tipo === 'mes') {
-                const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-                desde = primerDiaMes.toISOString().split('T')[0];
+                const ahora = new Date();
+                const partes = new Intl.DateTimeFormat('es-AR', {
+                    timeZone: 'America/Argentina/Buenos_Aires',
+                    year: 'numeric', month: '2-digit'
+                }).formatToParts(ahora);
+                const year = partes.find(p => p.type === 'year').value;
+                const month = partes.find(p => p.type === 'month').value;
+                desde = year + '-' + month + '-01';
             } else if (tipo === 'todo') {
                 desde = '';
                 hasta = '';
